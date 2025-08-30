@@ -6,6 +6,8 @@ from eth_abi import encode
 from eth_abi.packed import encode_packed
 from eth_defi import eip_712
 import web3
+from web3 import Web3
+from web3.types import HexBytes
 from eth_account import Account
 
 from .exceptions import EASError, EASValidationError, EASTransactionError
@@ -58,62 +60,49 @@ class EAS:
         except Exception as e:
             raise Exception(f"Failed to get schema: {str(e)}")
 
-    def get_offchain_uid(self, message, version=1):
+    def get_offchain_uid(self, version=1, schema=None, recipient=None, time=None, 
+                         expiration_time=0, revocable=True, ref_uid=None, data=b'', **kwargs):
         """Calculate the UID for an off-chain attestation message."""
+        # Build message from parameters
+        message = {
+            'version': version,
+            'schema': schema,
+            'recipient': recipient,
+            'time': time,
+            'expirationTime': expiration_time,
+            'revocable': revocable,
+            'refUID': ref_uid or '0x' + '0' * 64,
+            'data': data.hex() if isinstance(data, bytes) else data,
+        }
+        message.update(kwargs)  # Allow additional parameters
+        
         if version == 0:
             # Version 0 uses direct keccak
-            message_bytes = json.dumps(message).encode('utf-8')
-            return self.w3.keccak(message_bytes)
+            message_bytes = json.dumps(message, sort_keys=True).encode('utf-8')
+            return self.w3.keccak(message_bytes).hex()
         elif version == 1:
-            # Version 1 uses EIP-712 structured data hashing
-            domain = {
-                "name": "EAS Attestation",
-                "version": self.contract_version,
-                "chainId": self.chain_id,
-                "verifyingContract": self.contract_address
-            }
-
-            types = {
-                "Attest": [
-                    {"name": "version", "type": "uint16"},
-                    {"name": "schema", "type": "bytes32"},
-                    {"name": "recipient", "type": "address"},
-                    {"name": "time", "type": "uint64"},
-                    {"name": "expirationTime", "type": "uint64"},
-                    {"name": "revocable", "type": "bool"},
-                    {"name": "refUID", "type": "bytes32"},
-                    {"name": "data", "type": "bytes"},
-                    {"name": "salt", "type": "bytes32"}
-                ]
-            }
-
-            # Create typed data structure for EIP-712
-            typed_data = {
-                'types': {
-                    **types,
-                    'EIP712Domain': [
-                        {'name': 'name', 'type': 'string'},
-                        {'name': 'version', 'type': 'string'},
-                        {'name': 'chainId', 'type': 'uint256'},
-                        {'name': 'verifyingContract', 'type': 'address'}
-                    ]
-                },
-                'primaryType': 'Attest',
-                'domain': domain,
-                'message': message
-            }
-
-            # TODO: Fix EIP-712 implementation (see GitHub issue #11)
-            # The eth_defi library has bugs that prevent proper EIP-712 encoding
-            # Need to either fix library usage or switch to different EIP-712 implementation
-            raise NotImplementedError("EIP-712 implementation blocked by library issues (see issue #11)")
+            # Version 1 uses EIP-712 structured data hashing - blocked by issue #11
+            raise NotImplementedError(
+                "EIP-712 off-chain attestation UID generation is not yet implemented. "
+                "See GitHub issue #11 for EIP-712 implementation status."
+            )
         else:
-            raise ValueError(f"Unsupported off-chain UID version: {version}")
+            raise ValueError(f"Unsupported version: {version}")
 
     def attest_offchain(self, message):
         """Create an off-chain attestation."""
-        # Calculate UID for the message
-        message['uid'] = self.get_offchain_uid(message).hex()
+        # Calculate UID for the message using the message contents
+        uid = self.get_offchain_uid(
+            version=message.get('version', 1),
+            schema=message.get('schema'),
+            recipient=message.get('recipient'),
+            time=message.get('time'),
+            expiration_time=message.get('expirationTime', 0),
+            revocable=message.get('revocable', True),
+            ref_uid=message.get('refUID'),
+            data=message.get('data', b'')
+        )
+        message['uid'] = uid  # uid is already a hex string
         
         # Sign the message
         signature = self.w3.eth.account.sign_message(
@@ -470,21 +459,29 @@ class EAS:
         if not data:
             raise EASValidationError("Data cannot be empty", field_name="data")
         
-        # Convert to bytes if string
+        # Convert to bytes32 for contract call
         if isinstance(data, str):
             data_bytes = data.encode('utf-8')
         else:
             data_bytes = data
+        
+        # Convert to exactly 32 bytes by hashing if needed or padding
+        if len(data_bytes) <= 32:
+            # Pad with zeros to make exactly 32 bytes
+            data_bytes32 = data_bytes.ljust(32, b'\x00')
+        else:
+            # Hash to get exactly 32 bytes
+            data_bytes32 = self.w3.keccak(data_bytes)
             
         logger.info("timestamping_started", data_length=len(data_bytes))
         
         try:
             # Call contract's timestamp method directly
-            gas_estimate = self.easContract.functions.timestamp(data_bytes).estimate_gas({'from': self.from_account})
+            gas_estimate = self.easContract.functions.timestamp(data_bytes32).estimate_gas({'from': self.from_account})
             gas_limit = int(gas_estimate * 1.2)  # 20% buffer
             
             # Build transaction
-            transaction = self.easContract.functions.timestamp(data_bytes).build_transaction({
+            transaction = self.easContract.functions.timestamp(data_bytes32).build_transaction({
                 'from': self.from_account,
                 'gas': gas_limit,
                 'gasPrice': self.w3.eth.gas_price,
@@ -546,13 +543,23 @@ class EAS:
             if not item:
                 raise EASValidationError(f"Data item {i} cannot be empty", field_name=f"data_items[{i}]")
         
-        # Convert all items to bytes
+        # Convert all items to bytes32 (exactly 32 bytes each)
         data_bytes_list = []
         for item in data_items:
             if isinstance(item, str):
-                data_bytes_list.append(item.encode('utf-8'))
+                item_bytes = item.encode('utf-8')
             else:
-                data_bytes_list.append(item)
+                item_bytes = item
+            
+            # Convert to exactly 32 bytes by hashing if needed or padding
+            if len(item_bytes) <= 32:
+                # Pad with zeros to make exactly 32 bytes
+                bytes32_item = item_bytes.ljust(32, b'\x00')
+            else:
+                # Hash to get exactly 32 bytes
+                bytes32_item = self.w3.keccak(item_bytes)
+            
+            data_bytes_list.append(bytes32_item)
         
         logger.info("batch_timestamping_started", item_count=len(data_items))
         
@@ -622,45 +629,11 @@ class EAS:
             message_bytes = json.dumps(message, sort_keys=True).encode('utf-8')
             return self.w3.keccak(message_bytes)
         elif version == 1:
-            # Version 1 uses EIP-712 structured data hashing
-            domain = {
-                "name": "EAS Attestation",
-                "version": self.contract_version,
-                "chainId": self.chain_id,
-                "verifyingContract": self.contract_address
-            }
-
-            types = {
-                "Revoke": [
-                    {"name": "version", "type": "uint16"},
-                    {"name": "schema", "type": "bytes32"},
-                    {"name": "uid", "type": "bytes32"},
-                    {"name": "value", "type": "uint256"},
-                    {"name": "time", "type": "uint64"},
-                    {"name": "salt", "type": "bytes32"}
-                ]
-            }
-
-            # Create typed data structure for EIP-712
-            typed_data = {
-                'types': {
-                    **types,
-                    'EIP712Domain': [
-                        {'name': 'name', 'type': 'string'},
-                        {'name': 'version', 'type': 'string'},
-                        {'name': 'chainId', 'type': 'uint256'},
-                        {'name': 'verifyingContract', 'type': 'address'}
-                    ]
-                },
-                'primaryType': 'Revoke',
-                'domain': domain,
-                'message': message
-            }
-
-            # TODO: Fix EIP-712 implementation (see GitHub issue #11)
-            # The eth_defi library has bugs that prevent proper EIP-712 encoding
-            # Need to either fix library usage or switch to different EIP-712 implementation
-            raise NotImplementedError("EIP-712 implementation blocked by library issues (see issue #11)")
+            # Version 1 uses EIP-712 structured data hashing - blocked by issue #11
+            raise NotImplementedError(
+                "EIP-712 off-chain revocation UID generation is not yet implemented. "
+                "See GitHub issue #11 for EIP-712 implementation status."
+            )
         else:
             raise ValueError(f"Unsupported off-chain revocation UID version: {version}")
 
@@ -805,3 +778,203 @@ class EAS:
                 
             logger.error("offchain_revocation_failed", attestation_uid=attestation_uid, error=str(e))
             raise EASTransactionError(f"Off-chain revocation failed: {str(e)}")
+
+    @log_operation("multi_attest")
+    def multi_attest(self, attestation_requests: List[Dict[str, Any]]) -> TransactionResult:
+        """
+        Create multiple attestations in a single transaction for efficient gas usage.
+        
+        Args:
+            attestation_requests: List of attestation request dictionaries, each containing:
+                - schema_uid: Schema UID (bytes32 hex string)
+                - attestations: List of attestation data dictionaries with:
+                    - recipient: Recipient address
+                    - expiration_time: Expiration timestamp (default: 0)
+                    - revocable: Whether attestation can be revoked (default: True) 
+                    - ref_uid: Reference UID (default: zero address)
+                    - data: Encoded attestation data (bytes)
+                    - value: ETH value to send (default: 0)
+                    
+        Returns:
+            TransactionResult with array of attestation UIDs
+            
+        Raises:
+            EASValidationError: Invalid input data
+            EASTransactionError: Transaction execution failed
+        """
+        if not attestation_requests:
+            raise EASValidationError(
+                "Attestation requests list cannot be empty",
+                field_name="attestation_requests"
+            )
+        
+        # Validate and prepare multi-attestation requests
+        multi_requests = []
+        total_attestations = 0
+        
+        for i, request in enumerate(attestation_requests):
+            # Validate request structure
+            if not isinstance(request, dict):
+                raise EASValidationError(
+                    f"Request {i} must be a dictionary",
+                    field_name=f"attestation_requests[{i}]"
+                )
+            
+            schema_uid = request.get('schema_uid')
+            if not schema_uid or not schema_uid.startswith('0x'):
+                raise EASValidationError(
+                    f"Invalid schema UID format in request {i}",
+                    field_name=f"attestation_requests[{i}].schema_uid",
+                    field_value=schema_uid
+                )
+            
+            attestations = request.get('attestations', [])
+            if not attestations:
+                raise EASValidationError(
+                    f"Request {i} must contain at least one attestation",
+                    field_name=f"attestation_requests[{i}].attestations"
+                )
+            
+            # Prepare AttestationRequestData array for this schema
+            attestation_data_list = []
+            for j, attestation in enumerate(attestations):
+                if not isinstance(attestation, dict):
+                    raise EASValidationError(
+                        f"Attestation {j} in request {i} must be a dictionary",
+                        field_name=f"attestation_requests[{i}].attestations[{j}]"
+                    )
+                
+                # Extract and validate fields
+                recipient = attestation.get('recipient')
+                if not recipient or not self.w3.is_address(recipient):
+                    raise EASValidationError(
+                        f"Invalid recipient address in request {i}, attestation {j}",
+                        field_name=f"attestation_requests[{i}].attestations[{j}].recipient",
+                        field_value=recipient
+                    )
+                
+                expiration_time = attestation.get('expiration_time', 0)
+                revocable = attestation.get('revocable', True)
+                ref_uid = attestation.get('ref_uid', self.ZERO_ADDRESS)
+                data = attestation.get('data', b'')
+                value = attestation.get('value', 0)
+                
+                # Validate ref_uid format if provided
+                if ref_uid != self.ZERO_ADDRESS and not ref_uid.startswith('0x'):
+                    raise EASValidationError(
+                        f"Invalid ref_uid format in request {i}, attestation {j}",
+                        field_name=f"attestation_requests[{i}].attestations[{j}].ref_uid",
+                        field_value=ref_uid
+                    )
+                
+                # Build AttestationRequestData tuple with proper type conversions
+                # Convert ref_uid to proper bytes32 format (exactly 32 bytes)
+                if ref_uid != self.ZERO_ADDRESS:
+                    ref_uid_hex = ref_uid[2:] if ref_uid.startswith('0x') else ref_uid
+                    # Ensure exactly 32 bytes by padding with zeros or truncating
+                    ref_uid_hex = ref_uid_hex.ljust(64, '0')[:64]
+                    ref_uid_bytes = bytes.fromhex(ref_uid_hex)
+                else:
+                    ref_uid_bytes = b'\x00' * 32  # Exactly 32 zero bytes
+                
+                # Validate and convert integer types to their proper ranges
+                # uint64: 0 to 2^64-1 (18446744073709551615)
+                expiration_uint64 = max(0, min(int(expiration_time), 18446744073709551615))
+                
+                # uint256: 0 to 2^256-1  
+                value_uint256 = max(0, min(int(value), 2**256 - 1))
+                
+                attestation_data = (
+                    recipient,                    # address
+                    expiration_uint64,           # uint64 - properly constrained
+                    bool(revocable),             # bool
+                    ref_uid_bytes,               # bytes32 - exactly 32 bytes
+                    data if isinstance(data, bytes) else data.encode('utf-8'),  # bytes
+                    value_uint256                # uint256 - properly constrained
+                )
+                attestation_data_list.append(attestation_data)
+                total_attestations += 1
+            
+            # Build MultiAttestationRequest tuple (convert schema_uid to exactly 32 bytes)
+            # Ensure schema_uid is exactly 32 bytes for proper bytes32 contract type
+            schema_uid_hex = schema_uid[2:] if schema_uid.startswith('0x') else schema_uid
+            # Ensure exactly 32 bytes by padding with zeros or truncating  
+            schema_uid_hex = schema_uid_hex.ljust(64, '0')[:64]
+            schema_uid_bytes = bytes.fromhex(schema_uid_hex)
+            multi_request = (schema_uid_bytes, attestation_data_list)
+            multi_requests.append(multi_request)
+        
+        logger.info(
+            "multi_attest_started",
+            request_count=len(attestation_requests),
+            total_attestations=total_attestations
+        )
+        
+        try:
+            # Build contract call
+            function_call = self.easContract.functions.multiAttest(multi_requests)
+            
+            # Estimate gas with buffer, fallback to reasonable default if estimation fails
+            try:
+                gas_estimate = function_call.estimate_gas({'from': self.from_account})
+                gas_limit = int(gas_estimate * 1.2)  # 20% buffer
+                logger.info("multi_attest_gas_estimated", gas_estimate=gas_estimate, gas_limit=gas_limit)
+            except Exception as e:
+                # Gas estimation failed - use reasonable default and warn
+                gas_limit = 500000  # Conservative default for multi-attest
+                logger.warning(
+                    "multi_attest_gas_estimation_failed",
+                    error=str(e),
+                    fallback_gas_limit=gas_limit,
+                    message="Using fallback gas limit due to estimation failure"
+                )
+            
+            # Build transaction
+            transaction = function_call.build_transaction({
+                'from': self.from_account,
+                'gas': gas_limit,
+                'gasPrice': self.w3.eth.gas_price,
+                'nonce': self.w3.eth.get_transaction_count(self.from_account)
+            })
+            
+            # Sign and send transaction
+            signed_txn = Account.sign_transaction(transaction, private_key=self.private_key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash_hex = tx_hash.hex()
+            
+            logger.info("multi_attest_submitted", tx_hash=tx_hash_hex)
+            
+            # Wait for confirmation
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            
+            # Check transaction success
+            if receipt.get('status') != 1:
+                return TransactionResult.failure_from_error(
+                    tx_hash_hex,
+                    EASTransactionError("Multi-attest transaction failed", tx_hash_hex, receipt)
+                )
+            
+            result = TransactionResult.success_from_receipt(tx_hash_hex, receipt)
+            
+            logger.info(
+                "multi_attest_completed",
+                tx_hash=tx_hash_hex,
+                request_count=len(attestation_requests),
+                total_attestations=total_attestations,
+                gas_used=receipt.get('gasUsed'),
+                block_number=receipt.get('blockNumber')
+            )
+            
+            return result
+            
+        except Exception as e:
+            if isinstance(e, (EASValidationError, EASTransactionError)):
+                raise
+                
+            logger.error(
+                "multi_attest_failed",
+                request_count=len(attestation_requests),
+                total_attestations=total_attestations,
+                error=str(e)
+            )
+            raise EASTransactionError(f"Multi-attest failed: {str(e)}")

@@ -220,8 +220,11 @@ class TestLiveWriteOperations:
         # Create real EAS instance
         eas = EAS(rpc_url, contract_address, 84532, "1.3.0", from_account, private_key)
         
-        # Test schema registration with a simple test schema
-        test_schema = "string message,uint256 timestamp"
+        # Test schema registration with a unique test schema
+        import random
+        import string
+        random_field = ''.join(random.choices(string.ascii_lowercase, k=8))
+        test_schema = f"string {random_field},uint256 timestamp"
         
         try:
             result = eas.register_schema(
