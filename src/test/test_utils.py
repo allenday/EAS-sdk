@@ -50,22 +50,22 @@ def mock_private_key():
 @pytest.fixture
 def mock_address():
     """Provide a mock Ethereum address for unit tests."""
-    return "0x1234567890123456789012345678901234567890"
+    return "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD"
 
 
 @pytest.fixture
 def mock_tx_hash():
     """Provide a mock transaction hash for unit tests."""
-    return "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+    return "0xb1384f2ce6c62162d880e287fd0452846f7668cad837377c4146f204d3e4d892"
 
 
 @pytest.fixture
 def mock_schema_uid():
     """Provide a mock schema UID for unit tests."""
-    return "0xb7a45c9772f2fada6c02b9084b3e75217aa01a610e724eecd36aeb1a654a4c7e"
+    return "0x9848ff2e4109233f6eedad4fd2625bb899f124e8e5c195c2180a63366fb9860b"
 
 
 @pytest.fixture
 def mock_attestation_uid():
     """Provide a mock attestation UID for unit tests."""
-    return "0x3564005984522b56de1b87c44e2164ddc0bf5fe2b9a374e18edbfc9d85131e53"
+    return "0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f"
