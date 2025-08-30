@@ -592,3 +592,179 @@ class EAS:
                 
             logger.error("batch_timestamping_failed", item_count=len(data_items), error=str(e))
             raise EASTransactionError(f"Batch timestamping failed: {str(e)}")
+
+    @log_operation("multi_attest")
+    def multi_attest(self, attestation_requests: List[Dict[str, Any]]) -> TransactionResult:
+        """
+        Create multiple attestations in a single transaction for efficient gas usage.
+        
+        Args:
+            attestation_requests: List of attestation request dictionaries, each containing:
+                - schema_uid: Schema UID (bytes32 hex string)
+                - attestations: List of attestation data dictionaries with:
+                    - recipient: Recipient address
+                    - expiration_time: Expiration timestamp (default: 0)
+                    - revocable: Whether attestation can be revoked (default: True) 
+                    - ref_uid: Reference UID (default: zero address)
+                    - data: Encoded attestation data (bytes)
+                    - value: ETH value to send (default: 0)
+                    
+        Returns:
+            TransactionResult with array of attestation UIDs
+            
+        Raises:
+            EASValidationError: Invalid input data
+            EASTransactionError: Transaction execution failed
+        """
+        if not attestation_requests:
+            raise EASValidationError(
+                "Attestation requests list cannot be empty",
+                field_name="attestation_requests"
+            )
+        
+        # Validate and prepare multi-attestation requests
+        multi_requests = []
+        total_attestations = 0
+        
+        for i, request in enumerate(attestation_requests):
+            # Validate request structure
+            if not isinstance(request, dict):
+                raise EASValidationError(
+                    f"Request {i} must be a dictionary",
+                    field_name=f"attestation_requests[{i}]"
+                )
+            
+            schema_uid = request.get('schema_uid')
+            if not schema_uid or not schema_uid.startswith('0x'):
+                raise EASValidationError(
+                    f"Invalid schema UID format in request {i}",
+                    field_name=f"attestation_requests[{i}].schema_uid",
+                    field_value=schema_uid
+                )
+            
+            attestations = request.get('attestations', [])
+            if not attestations:
+                raise EASValidationError(
+                    f"Request {i} must contain at least one attestation",
+                    field_name=f"attestation_requests[{i}].attestations"
+                )
+            
+            # Prepare AttestationRequestData array for this schema
+            attestation_data_list = []
+            for j, attestation in enumerate(attestations):
+                if not isinstance(attestation, dict):
+                    raise EASValidationError(
+                        f"Attestation {j} in request {i} must be a dictionary",
+                        field_name=f"attestation_requests[{i}].attestations[{j}]"
+                    )
+                
+                # Extract and validate fields
+                recipient = attestation.get('recipient')
+                if not recipient or not self.w3.is_address(recipient):
+                    raise EASValidationError(
+                        f"Invalid recipient address in request {i}, attestation {j}",
+                        field_name=f"attestation_requests[{i}].attestations[{j}].recipient",
+                        field_value=recipient
+                    )
+                
+                expiration_time = attestation.get('expiration_time', 0)
+                revocable = attestation.get('revocable', True)
+                ref_uid = attestation.get('ref_uid', self.ZERO_ADDRESS)
+                data = attestation.get('data', b'')
+                value = attestation.get('value', 0)
+                
+                # Validate ref_uid format if provided
+                if ref_uid != self.ZERO_ADDRESS and not ref_uid.startswith('0x'):
+                    raise EASValidationError(
+                        f"Invalid ref_uid format in request {i}, attestation {j}",
+                        field_name=f"attestation_requests[{i}].attestations[{j}].ref_uid",
+                        field_value=ref_uid
+                    )
+                
+                # Build AttestationRequestData tuple
+                ref_uid_bytes = bytes.fromhex(ref_uid[2:]) if ref_uid != self.ZERO_ADDRESS else bytes(32)
+                attestation_data = (
+                    recipient,                    # address
+                    int(expiration_time),        # uint64
+                    bool(revocable),             # bool
+                    ref_uid_bytes,               # bytes32
+                    data if isinstance(data, bytes) else data.encode('utf-8'),  # bytes
+                    int(value)                   # uint256
+                )
+                attestation_data_list.append(attestation_data)
+                total_attestations += 1
+            
+            # Build MultiAttestationRequest tuple (convert schema_uid to bytes)
+            schema_uid_bytes = bytes.fromhex(schema_uid[2:])  # Remove '0x' prefix and convert to bytes
+            multi_request = (schema_uid_bytes, attestation_data_list)
+            multi_requests.append(multi_request)
+        
+        logger.info(
+            "multi_attest_started",
+            request_count=len(attestation_requests),
+            total_attestations=total_attestations
+        )
+        
+        try:
+            # Build contract call
+            function_call = self.easContract.functions.multiAttest(multi_requests)
+            
+            # Estimate gas with buffer
+            try:
+                gas_estimate = function_call.estimate_gas({'from': self.from_account})
+                gas_limit = int(gas_estimate * 1.2)  # 20% buffer
+            except Exception as e:
+                raise EASTransactionError(
+                    f"Gas estimation failed for multi-attest: {str(e)}",
+                    tx_hash=None
+                )
+            
+            # Build transaction
+            transaction = function_call.build_transaction({
+                'from': self.from_account,
+                'gas': gas_limit,
+                'gasPrice': self.w3.eth.gas_price,
+                'nonce': self.w3.eth.get_transaction_count(self.from_account)
+            })
+            
+            # Sign and send transaction
+            signed_txn = Account.sign_transaction(transaction, private_key=self.private_key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash_hex = tx_hash.hex()
+            
+            logger.info("multi_attest_submitted", tx_hash=tx_hash_hex)
+            
+            # Wait for confirmation
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            
+            # Check transaction success
+            if receipt.get('status') != 1:
+                return TransactionResult.failure_from_error(
+                    tx_hash_hex,
+                    EASTransactionError("Multi-attest transaction failed", tx_hash_hex, receipt)
+                )
+            
+            result = TransactionResult.success_from_receipt(tx_hash_hex, receipt)
+            
+            logger.info(
+                "multi_attest_completed",
+                tx_hash=tx_hash_hex,
+                request_count=len(attestation_requests),
+                total_attestations=total_attestations,
+                gas_used=receipt.get('gasUsed'),
+                block_number=receipt.get('blockNumber')
+            )
+            
+            return result
+            
+        except Exception as e:
+            if isinstance(e, (EASValidationError, EASTransactionError)):
+                raise
+                
+            logger.error(
+                "multi_attest_failed",
+                request_count=len(attestation_requests),
+                total_attestations=total_attestations,
+                error=str(e)
+            )
+            raise EASTransactionError(f"Multi-attest failed: {str(e)}")
