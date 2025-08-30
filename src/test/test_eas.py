@@ -132,18 +132,18 @@ class TestEAS:
                 private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
             )
 
-            uid = eas.get_offchain_uid(
-                version=1,
-                schema="test_schema",
-                recipient="0x1234567890123456789012345678901234567890",
-                time=1234567890,
-                expiration_time=1234567899,
-                revocable=True,
-                ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
-                data=b"test_data"
-            )
-
-            assert uid == "6b656363616b5f68617368"  # hex of b'keccak_hash'
+            # Version 1 should raise NotImplementedError due to EIP-712 blocking issue #11
+            with pytest.raises(NotImplementedError, match="EIP-712 off-chain attestation UID generation is not yet implemented"):
+                eas.get_offchain_uid(
+                    version=1,
+                    schema="test_schema",
+                    recipient="0x1234567890123456789012345678901234567890",
+                    time=1234567890,
+                    expiration_time=1234567899,
+                    revocable=True,
+                    ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
+                    data=b"test_data"
+                )
 
     def test_get_offchain_uid_unsupported_version(self, mock_web3, mock_contract):
         """Test get_offchain_uid with unsupported version"""
