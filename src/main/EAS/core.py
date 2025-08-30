@@ -87,13 +87,26 @@ class EAS:
                 ]
             }
 
-            signed_message = eip_712.encode_typed_data(
-                domain_data=domain,
-                message_types=types,
-                message_data=message
-            )
+            # Create typed data structure for EIP-712
+            typed_data = {
+                'types': {
+                    **types,
+                    'EIP712Domain': [
+                        {'name': 'name', 'type': 'string'},
+                        {'name': 'version', 'type': 'string'},
+                        {'name': 'chainId', 'type': 'uint256'},
+                        {'name': 'verifyingContract', 'type': 'address'}
+                    ]
+                },
+                'primaryType': 'Attest',
+                'domain': domain,
+                'message': message
+            }
 
-            return self.w3.keccak(signed_message)
+            # TODO: Fix EIP-712 implementation (see GitHub issue #11)
+            # The eth_defi library has bugs that prevent proper EIP-712 encoding
+            # Need to either fix library usage or switch to different EIP-712 implementation
+            raise NotImplementedError("EIP-712 implementation blocked by library issues (see issue #11)")
         else:
             raise ValueError(f"Unsupported off-chain UID version: {version}")
 
@@ -592,3 +605,203 @@ class EAS:
                 
             logger.error("batch_timestamping_failed", item_count=len(data_items), error=str(e))
             raise EASTransactionError(f"Batch timestamping failed: {str(e)}")
+
+    def get_offchain_revocation_uid(self, message: Dict[str, Any], version: int = 1) -> bytes:
+        """
+        Calculate the UID for an off-chain revocation message.
+        
+        Args:
+            message: Revocation message containing uid, time, value, etc.
+            version: Off-chain revocation version (0 or 1)
+            
+        Returns:
+            bytes: The calculated UID for the revocation
+        """
+        if version == 0:
+            # Version 0 uses direct keccak
+            message_bytes = json.dumps(message, sort_keys=True).encode('utf-8')
+            return self.w3.keccak(message_bytes)
+        elif version == 1:
+            # Version 1 uses EIP-712 structured data hashing
+            domain = {
+                "name": "EAS Attestation",
+                "version": self.contract_version,
+                "chainId": self.chain_id,
+                "verifyingContract": self.contract_address
+            }
+
+            types = {
+                "Revoke": [
+                    {"name": "version", "type": "uint16"},
+                    {"name": "schema", "type": "bytes32"},
+                    {"name": "uid", "type": "bytes32"},
+                    {"name": "value", "type": "uint256"},
+                    {"name": "time", "type": "uint64"},
+                    {"name": "salt", "type": "bytes32"}
+                ]
+            }
+
+            # Create typed data structure for EIP-712
+            typed_data = {
+                'types': {
+                    **types,
+                    'EIP712Domain': [
+                        {'name': 'name', 'type': 'string'},
+                        {'name': 'version', 'type': 'string'},
+                        {'name': 'chainId', 'type': 'uint256'},
+                        {'name': 'verifyingContract', 'type': 'address'}
+                    ]
+                },
+                'primaryType': 'Revoke',
+                'domain': domain,
+                'message': message
+            }
+
+            # TODO: Fix EIP-712 implementation (see GitHub issue #11)
+            # The eth_defi library has bugs that prevent proper EIP-712 encoding
+            # Need to either fix library usage or switch to different EIP-712 implementation
+            raise NotImplementedError("EIP-712 implementation blocked by library issues (see issue #11)")
+        else:
+            raise ValueError(f"Unsupported off-chain revocation UID version: {version}")
+
+    @log_operation("offchain_revocation")
+    def revoke_offchain(
+        self, 
+        attestation_uid: str,
+        schema_uid: str = None,
+        value: int = 0,
+        reason: str = None
+    ) -> Dict[str, Any]:
+        """
+        Create an off-chain revocation for a previously created attestation.
+        
+        Args:
+            attestation_uid: UID of the attestation to revoke
+            schema_uid: Optional schema UID (uses zero address if not provided)
+            value: Optional value associated with revocation
+            reason: Optional reason for revocation (stored in metadata)
+            
+        Returns:
+            Dict containing the signed off-chain revocation
+        """
+        if not attestation_uid or not attestation_uid.startswith('0x'):
+            raise EASValidationError(
+                "Invalid attestation UID format", 
+                field_name="attestation_uid", 
+                field_value=attestation_uid
+            )
+
+        logger.info("offchain_revocation_started", attestation_uid=attestation_uid)
+
+        try:
+            # Use current timestamp
+            current_time = int(time.time())
+            
+            # Generate salt for uniqueness
+            salt = os.urandom(32)
+            
+            # Build revocation message
+            revocation_message = {
+                "version": 1,
+                "schema": schema_uid or self.ZERO_ADDRESS,
+                "uid": attestation_uid,
+                "value": value,
+                "time": current_time,
+                "salt": "0x" + salt.hex()
+            }
+
+            # Calculate UID for this revocation
+            revocation_uid = self.get_offchain_revocation_uid(revocation_message, version=1)
+            revocation_message['revocation_uid'] = revocation_uid.hex()
+
+            # Create EIP-712 domain
+            domain = {
+                "name": "EAS Attestation",
+                "version": self.contract_version,
+                "chainId": self.chain_id,
+                "verifyingContract": self.contract_address
+            }
+
+            # Define types for EIP-712 signature
+            types = {
+                "Revoke": [
+                    {"name": "version", "type": "uint16"},
+                    {"name": "schema", "type": "bytes32"},
+                    {"name": "uid", "type": "bytes32"},
+                    {"name": "value", "type": "uint256"},
+                    {"name": "time", "type": "uint64"},
+                    {"name": "salt", "type": "bytes32"}
+                ]
+            }
+
+            # Prepare message for signing (without revocation_uid)
+            signing_message = {
+                "version": revocation_message["version"],
+                "schema": revocation_message["schema"],
+                "uid": revocation_message["uid"],
+                "value": revocation_message["value"],
+                "time": revocation_message["time"],
+                "salt": revocation_message["salt"]
+            }
+
+            # Create typed data structure
+            typed_data = {
+                'types': types,
+                'primaryType': 'Revoke',
+                'domain': domain,
+                'message': signing_message
+            }
+
+            # Add EIP712Domain to types
+            typed_data['types']['EIP712Domain'] = [
+                {'name': 'name', 'type': 'string'},
+                {'name': 'version', 'type': 'string'},
+                {'name': 'chainId', 'type': 'uint256'},
+                {'name': 'verifyingContract', 'type': 'address'}
+            ]
+
+            # Encode and sign the data using eth_defi
+            encoded_data = eip_712.eip712_encode(typed_data)
+            signature = eip_712.eip712_signature(encoded_data, self.private_key)
+
+            # Convert signature to r, s, v format
+            r = self.w3.to_hex(signature[:32])
+            s = self.w3.to_hex(signature[32:64])
+            v = signature[64]
+
+            # Build the final revocation object
+            offchain_revocation = {
+                'revoker': self.from_account,
+                'uid': revocation_uid.hex(),
+                'data': {
+                    'domain': domain,
+                    'primaryType': 'Revoke',
+                    'types': types,
+                    'message': revocation_message,
+                    'signature': {
+                        'r': r,
+                        's': s,
+                        'v': v
+                    }
+                }
+            }
+
+            # Add reason if provided
+            if reason:
+                offchain_revocation['data']['reason'] = reason
+
+            logger.info(
+                "offchain_revocation_completed",
+                attestation_uid=attestation_uid,
+                revocation_uid=revocation_uid.hex(),
+                revoker=self.from_account
+            )
+
+            return offchain_revocation
+
+        except Exception as e:
+            if isinstance(e, EASValidationError):
+                raise
+                
+            logger.error("offchain_revocation_failed", attestation_uid=attestation_uid, error=str(e))
+            raise EASTransactionError(f"Off-chain revocation failed: {str(e)}")
