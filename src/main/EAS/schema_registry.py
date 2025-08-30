@@ -131,14 +131,8 @@ class SchemaRegistry:
             function_call = self.contract.functions.register(schema, resolver, revocable)
             
             # Estimate gas
-            try:
-                gas_estimate = function_call.estimate_gas({'from': self.from_account})
-                gas_limit = int(gas_estimate * 1.2)  # 20% buffer
-            except Exception as e:
-                raise EASTransactionError(
-                    f"Gas estimation failed: {str(e)}",
-                    tx_hash=None
-                )
+            gas_estimate = function_call.estimate_gas({'from': self.from_account})
+            gas_limit = int(gas_estimate * 1.2)  # 20% buffer
             
             # Build transaction data
             transaction = function_call.build_transaction({
