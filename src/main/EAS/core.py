@@ -6,6 +6,12 @@ from eth_abi.packed import encode_packed
 from eth_defi import eip_712
 import web3
 
+from .exceptions import EASError, EASValidationError, EASTransactionError
+from .transaction import TransactionResult
+from .observability import log_operation, get_logger
+
+logger = get_logger("eas_core")
+
 
 class EAS:
 
