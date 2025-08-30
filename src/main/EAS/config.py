@@ -31,6 +31,13 @@ NETWORKS = {
         "chain_id": 5,
         "contract_version": "0.26",
         "name": "Goerli Testnet"
+    },
+    "base-sepolia": {
+        "rpc_url": "https://sepolia.base.org",
+        "contract_address": "0x4200000000000000000000000000000000000021",
+        "chain_id": 84532,
+        "contract_version": "0.26",
+        "name": "Base Sepolia Testnet"
     }
 }
 
