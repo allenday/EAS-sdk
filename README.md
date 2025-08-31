@@ -4,14 +4,118 @@ A Python SDK for Ethereum Attestation Service (EAS) that provides easy-to-use me
 
 ## Features
 
+### Core EAS Functionality
 - **On-chain Attestations**: Create and submit attestations directly to the blockchain
 - **Off-chain Attestations**: Generate signed attestation data for off-chain use
-- **EIP-712 Support**: Full support for EIP-712 typed data signing
-- **Web3 Integration**: Built on top of web3.py for Ethereum interaction
+- **Multi-Attestations**: Efficient batch attestation operations
+- **Attestation Revocation**: Revoke both on-chain and off-chain attestations
+- **Schema Management**: Register and retrieve EAS schemas
+- **Data Timestamping**: Timestamp arbitrary data on-chain
+
+### Python SDK Advantages
 - **Beautiful CLI**: Rich command-line interface with syntax highlighting and tables
 - **GraphQL API**: Direct integration with EAS GraphQL endpoints for data retrieval
 - **Protocol Buffers**: Generated protobuf messages for type-safe API responses
+- **EIP-712 Support**: Full support for EIP-712 typed data signing
+- **Web3 Integration**: Built on top of web3.py for Ethereum interaction
 - **Multi-Network Support**: Works with mainnet, testnets, and Layer 2 networks
+- **Enhanced DX**: Structured logging, error handling, and Python-native patterns
+
+### Currently Not Supported
+- **Delegated Attestations**: Use TypeScript SDK for delegation functionality
+- **Private Data & Merkle Trees**: Use TypeScript SDK for selective data disclosure
+- **Off-chain Signature Verification**: Use TypeScript SDK for signature verification
+
+## Feature Comparison with TypeScript SDK
+
+| Feature | Python SDK | TypeScript SDK | Notes |
+|---------|------------|----------------|--------|
+| **Core Attestations** | | | |
+| On-chain attestations | ✅ `create_attestation()` | ✅ `attest()` | Full support |
+| Off-chain attestations | ✅ `attest_offchain()` | ✅ `signOffchainAttestation()` | Full support |
+| Multi-attestations | ✅ `multi_attest()` | ✅ `multiAttest()` | Batch operations |
+| Attestation revocation | ✅ `revoke_attestation()` | ✅ `revoke()` | Full support |
+| Multi-revocation | ✅ `multi_revoke()` | ✅ `multiRevoke()` | Batch operations |
+| Off-chain revocation | ✅ `revoke_offchain()` | ✅ `revokeOffchain()` | Full support |
+| **Schema Management** | | | |
+| Schema registration | ✅ `register_schema()` | ✅ `register()` | Full support |
+| Schema retrieval | ✅ `get_schema()` | ✅ `getSchema()` | Full support |
+| Schema encoding | 🟡 Manual encoding | ✅ `SchemaEncoder` class | Different approach |
+| **Delegated Operations** | | | |
+| Delegated attestations | ❌ Not implemented | ✅ `attestByDelegation()` | **Missing** |
+| Delegated revocations | ❌ Not implemented | ✅ `revokeByDelegation()` | **Missing** |
+| **Private Data** | | | |
+| Merkle tree support | ❌ Not implemented | ✅ `PrivateData` class | **Missing** |
+| Selective revelation | ❌ Not implemented | ✅ `generateMultiProof()` | **Missing** |
+| **Verification** | | | |
+| Off-chain signature verification | ❌ Not implemented | ✅ `verifyOffchainAttestationSignature()` | **Missing** |
+| **Timestamps** | | | |
+| Data timestamping | ✅ `timestamp()` | ✅ `timestamp()` | Full support |
+| Multi-timestamping | ✅ `multi_timestamp()` | ✅ `multiTimestamp()` | Full support |
+| **Python-Specific Advantages** | | | |
+| CLI tools with rich output | ✅ `eas-tools` | ❌ Not available | **Python advantage** |
+| Protocol Buffers integration | ✅ Auto-generated | ❌ Not available | **Python advantage** |
+| GraphQL API integration | ✅ Direct API calls | ❌ Not available | **Python advantage** |
+| Structured logging | ✅ Built-in | ❌ Manual setup | **Python advantage** |
+
+### Current Limitations
+
+The Python SDK is missing several key features compared to the TypeScript SDK:
+
+**❌ Missing High-Impact Features:**
+- **Delegated Attestations & Revocations**: Complete absence of delegation functionality
+- **Private Data & Merkle Trees**: No support for selective data disclosure
+- **Off-chain Signature Verification**: Cannot verify off-chain attestation signatures
+
+**🟡 API Differences:**
+- **Schema Encoding**: Python uses manual encoding vs TypeScript's `SchemaEncoder` class
+- **Method Naming**: Different naming conventions (`create_attestation()` vs `attest()`)
+- **Architecture**: Integrated approach vs separate class-based design
+
+**✅ Python SDK Unique Advantages:**
+- **Rich CLI Tools**: Beautiful command-line interface with tables and syntax highlighting
+- **Protocol Buffers**: Type-safe schema generation and binary encoding
+- **GraphQL Integration**: Direct API access for querying attestations and schemas
+- **Developer Experience**: Enhanced logging, error handling, and Python-native patterns
+
+### When to Choose Each SDK
+
+**Choose TypeScript SDK when:**
+- You need delegated attestations or revocations
+- Private data and selective revelation are required
+- Full feature parity with EAS protocol is needed
+- Working in a JavaScript/TypeScript ecosystem
+
+**Choose Python SDK when:**
+- You prefer Python development environment
+- CLI tools and rich output formatting are valuable
+- Protocol Buffers integration is beneficial
+- Core attestation functionality is sufficient for your use case
+
+## Development Roadmap
+
+### Planned Features (Future Releases)
+
+**High Priority:**
+- **Delegated Attestations**: Implementation of `attestByDelegation()` and `revokeByDelegation()` methods ([#14](https://github.com/allenday/EAS-sdk/issues/14))
+- **Off-chain Signature Verification**: Add `verifyOffchainAttestationSignature()` functionality ([#15](https://github.com/allenday/EAS-sdk/issues/15))
+- **Schema Encoder Class**: Python equivalent of TypeScript's `SchemaEncoder` for easier schema handling ([#16](https://github.com/allenday/EAS-sdk/issues/16))
+
+**Medium Priority:**
+- **Private Data Support**: Merkle tree implementation for selective data disclosure ([#17](https://github.com/allenday/EAS-sdk/issues/17))
+- **Enhanced Gas Estimation**: More sophisticated gas optimization strategies ([#18](https://github.com/allenday/EAS-sdk/issues/18))
+- **Batch Operations Optimization**: Performance improvements for large batch operations
+
+**Low Priority:**
+- **Additional Network Support**: Expanded testnet and Layer 2 network configurations
+- **Advanced CLI Features**: More interactive CLI tools and data visualization
+
+### Contributing
+
+Missing a feature you need? We welcome contributions! Check out our:
+- [GitHub Issues](https://github.com/allenday/EAS-sdk/issues) for feature requests
+- [Contributing Guidelines](CONTRIBUTING.md) for development setup
+- [Security Guidelines](SECURITY.md) for security-related contributions
 
 ## Installation
 
@@ -120,6 +224,106 @@ receipt = eas.onchain_attestation(
     data=b"attestation data",
     value=0  # ETH value to send with transaction
 )
+```
+
+### Advanced Configuration
+
+#### Custom Networks and Contract Addresses
+
+```python
+from EAS import EAS
+
+# Custom RPC, contract address, and version configuration
+eas = EAS(
+    rpc_url="https://custom-rpc.network",
+    contract_address="0x4200000000000000000000000000000000000021",  # Custom EAS contract
+    chain_id=42,  # Custom network
+    contract_version="0.26",
+    from_account="0x0fB2FA8306F661E31C7BFE76a5fF3A3F85a9f9A2",
+    private_key="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+)
+```
+
+#### Multi-Attestation Operations
+
+```python
+import time
+from EAS import EAS
+
+# Multi-attestation for efficient batch operations
+multi_attestation_requests = [
+    {
+        "schema_uid": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
+        "attestations": [
+            {
+                "recipient": "0x5678901234abcdef5678901234abcdef56789012",
+                "data": b"first attestation data",
+                "expiration_time": int(time.time()) + 86400  # 1 day from now
+            },
+            {
+                "recipient": "0x9012345678abcdef9012345678abcdef90123456",
+                "data": b"second attestation data",
+                "revocable": False
+            }
+        ]
+    }
+]
+
+result = eas.multi_attest(multi_attestation_requests)
+print(f"Multi-attestation transaction: {result.tx_hash}")
+```
+
+#### Off-chain Revocation
+
+```python
+# Create off-chain revocation with optional reason
+revocation = eas.revoke_offchain(
+    attestation_uid="0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+    reason="Incorrect information provided"
+)
+
+# Save revocation to file
+eas.save_to_file(revocation, "revocation.json")
+
+# The revocation includes signature and can be verified off-chain
+print(f"Revocation UID: {revocation['uid']}")
+print(f"Signature: {revocation['signature']}")
+```
+
+#### Error Handling Best Practices
+
+```python
+from EAS import EAS
+from EAS.exceptions import EASValidationError, EASTransactionError
+
+try:
+    eas = EAS(
+        rpc_url="https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
+        from_account="0x...",
+        private_key="0x..."
+    )
+    
+    # Attempt attestation with validation
+    result = eas.onchain_attestation(
+        schema="0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
+        recipient="0x5678901234abcdef5678901234abcdef56789012",
+        data=b"attestation data"
+    )
+    
+    print(f"Attestation successful: {result.tx_hash}")
+    
+except EASValidationError as e:
+    print(f"Validation error: {e.message}")
+    print(f"Invalid field: {e.field_name} = {e.field_value}")
+    
+except EASTransactionError as e:
+    print(f"Transaction failed: {e.message}")
+    print(f"Transaction hash: {e.tx_hash}")
+    if e.receipt:
+        print(f"Gas used: {e.receipt.get('gasUsed')}")
+        
+except Exception as e:
+    print(f"Unexpected error: {e}")
 ```
 
 ## Examples
