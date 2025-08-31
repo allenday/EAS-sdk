@@ -4,7 +4,7 @@ import os
 from typing import List, Dict, Any, Optional, Union
 from eth_abi import encode
 from eth_abi.packed import encode_packed
-from eth_defi import eip_712
+from eth_account.messages import encode_typed_data
 import web3
 from web3 import Web3
 from web3.types import HexBytes
@@ -81,11 +81,92 @@ class EAS:
             message_bytes = json.dumps(message, sort_keys=True).encode('utf-8')
             return self.w3.keccak(message_bytes).hex()
         elif version == 1:
-            # Version 1 uses EIP-712 structured data hashing - blocked by issue #11
-            raise NotImplementedError(
-                "EIP-712 off-chain attestation UID generation is not yet implemented. "
-                "See GitHub issue #11 for EIP-712 implementation status."
-            )
+            # Version 1 uses EIP-712 structured data hashing
+            # Create EIP-712 domain
+            domain = {
+                "name": "EAS Attestation",
+                "version": self.contract_version,
+                "chainId": self.chain_id,
+                "verifyingContract": self.contract_address
+            }
+
+            # Define EIP-712 types for attestation
+            types = {
+                'EIP712Domain': [
+                    {'name': 'name', 'type': 'string'},
+                    {'name': 'version', 'type': 'string'},
+                    {'name': 'chainId', 'type': 'uint256'},
+                    {'name': 'verifyingContract', 'type': 'address'}
+                ],
+                'Attest': [
+                    {'name': 'version', 'type': 'uint16'},
+                    {'name': 'schema', 'type': 'bytes32'},
+                    {'name': 'recipient', 'type': 'address'},
+                    {'name': 'time', 'type': 'uint64'},
+                    {'name': 'expirationTime', 'type': 'uint64'},
+                    {'name': 'revocable', 'type': 'bool'},
+                    {'name': 'refUID', 'type': 'bytes32'},
+                    {'name': 'data', 'type': 'bytes'}
+                ]
+            }
+
+            # Ensure ref_uid is properly formatted as bytes32 - convert to bytes
+            ref_uid_str = ref_uid or '0x' + '0' * 64
+            if not ref_uid_str.startswith('0x'):
+                ref_uid_str = '0x' + ref_uid_str
+            # Ensure exactly 64 hex characters (32 bytes) and convert to bytes
+            ref_uid_hex = ref_uid_str[2:].ljust(64, '0')[:64]
+            formatted_ref_uid = bytes.fromhex(ref_uid_hex)
+            
+            # Format schema as bytes32 - convert hex string to bytes
+            if isinstance(schema, str):
+                if schema.startswith('0x'):
+                    schema_hex = schema[2:]
+                else:
+                    schema_hex = schema
+                # Ensure exactly 64 hex characters (32 bytes)
+                schema_hex = schema_hex.ljust(64, '0')[:64]
+                formatted_schema = bytes.fromhex(schema_hex)
+            else:
+                formatted_schema = schema
+            
+            # Convert data to bytes for EIP-712 encoding
+            if isinstance(data, bytes):
+                formatted_data = data
+            elif isinstance(data, str):
+                if data.startswith('0x'):
+                    formatted_data = bytes.fromhex(data[2:])
+                else:
+                    formatted_data = data.encode('utf-8')
+            else:
+                formatted_data = str(data).encode('utf-8')
+            
+            # Prepare message for EIP-712 encoding
+            eip712_message = {
+                'version': version,
+                'schema': formatted_schema,
+                'recipient': recipient,
+                'time': time,
+                'expirationTime': expiration_time,
+                'revocable': revocable,
+                'refUID': formatted_ref_uid,
+                'data': formatted_data
+            }
+
+            # Create the complete EIP-712 typed data structure
+            typed_data = {
+                'types': types,
+                'primaryType': 'Attest',
+                'domain': domain,
+                'message': eip712_message
+            }
+
+            # Encode and hash the structured data using eth_account
+            from eth_account.messages import encode_typed_data, _hash_eip191_message
+            encoded_message = encode_typed_data(full_message=typed_data)
+            # Get the signable hash for the structured data
+            message_hash = _hash_eip191_message(encoded_message)
+            return "0x" + message_hash.hex()
         else:
             raise ValueError(f"Unsupported version: {version}")
 
@@ -629,11 +710,76 @@ class EAS:
             message_bytes = json.dumps(message, sort_keys=True).encode('utf-8')
             return self.w3.keccak(message_bytes)
         elif version == 1:
-            # Version 1 uses EIP-712 structured data hashing - blocked by issue #11
-            raise NotImplementedError(
-                "EIP-712 off-chain revocation UID generation is not yet implemented. "
-                "See GitHub issue #11 for EIP-712 implementation status."
-            )
+            # Version 1 uses EIP-712 structured data hashing
+            # Create EIP-712 domain
+            domain = {
+                "name": "EAS Attestation",
+                "version": self.contract_version,
+                "chainId": self.chain_id,
+                "verifyingContract": self.contract_address
+            }
+
+            # Define EIP-712 types for revocation
+            types = {
+                'EIP712Domain': [
+                    {'name': 'name', 'type': 'string'},
+                    {'name': 'version', 'type': 'string'},
+                    {'name': 'chainId', 'type': 'uint256'},
+                    {'name': 'verifyingContract', 'type': 'address'}
+                ],
+                'Revoke': [
+                    {'name': 'version', 'type': 'uint16'},
+                    {'name': 'schema', 'type': 'bytes32'},
+                    {'name': 'uid', 'type': 'bytes32'},
+                    {'name': 'value', 'type': 'uint256'},
+                    {'name': 'time', 'type': 'uint64'},
+                    {'name': 'salt', 'type': 'bytes32'}
+                ]
+            }
+
+            # Format fields properly for EIP-712 - convert to bytes
+            schema_str = message.get('schema', '0x' + '0' * 64)
+            if not schema_str.startswith('0x'):
+                schema_str = '0x' + schema_str
+            schema_hex = schema_str[2:].ljust(64, '0')[:64]
+            formatted_schema = bytes.fromhex(schema_hex)
+            
+            uid_str = message.get('uid', '0x' + '0' * 64)
+            if not uid_str.startswith('0x'):
+                uid_str = '0x' + uid_str
+            uid_hex = uid_str[2:].ljust(64, '0')[:64]
+            formatted_uid = bytes.fromhex(uid_hex)
+            
+            salt_str = message.get('salt', '0x' + '0' * 64)
+            if not salt_str.startswith('0x'):
+                salt_str = '0x' + salt_str
+            salt_hex = salt_str[2:].ljust(64, '0')[:64]
+            formatted_salt = bytes.fromhex(salt_hex)
+
+            # Prepare message for EIP-712 encoding
+            eip712_message = {
+                'version': message.get('version', 1),
+                'schema': formatted_schema,
+                'uid': formatted_uid,
+                'value': message.get('value', 0),
+                'time': message.get('time', 0),
+                'salt': formatted_salt
+            }
+
+            # Create the complete EIP-712 typed data structure
+            typed_data = {
+                'types': types,
+                'primaryType': 'Revoke',
+                'domain': domain,
+                'message': eip712_message
+            }
+
+            # Encode and hash the structured data using eth_account
+            from eth_account.messages import encode_typed_data, _hash_eip191_message
+            encoded_message = encode_typed_data(full_message=typed_data)
+            # Get the signable hash for the structured data
+            message_hash = _hash_eip191_message(encoded_message)
+            return message_hash
         else:
             raise ValueError(f"Unsupported off-chain revocation UID version: {version}")
 
@@ -707,14 +853,32 @@ class EAS:
                 ]
             }
 
-            # Prepare message for signing (without revocation_uid)
+            # Prepare message for signing (without revocation_uid) - convert bytes32 fields
+            schema_str = revocation_message["schema"]
+            if not schema_str.startswith('0x'):
+                schema_str = '0x' + schema_str
+            schema_hex = schema_str[2:].ljust(64, '0')[:64]
+            formatted_schema = bytes.fromhex(schema_hex)
+            
+            uid_str = revocation_message["uid"]
+            if not uid_str.startswith('0x'):
+                uid_str = '0x' + uid_str
+            uid_hex = uid_str[2:].ljust(64, '0')[:64]
+            formatted_uid = bytes.fromhex(uid_hex)
+            
+            salt_str = revocation_message["salt"]
+            if not salt_str.startswith('0x'):
+                salt_str = '0x' + salt_str
+            salt_hex = salt_str[2:].ljust(64, '0')[:64]
+            formatted_salt = bytes.fromhex(salt_hex)
+
             signing_message = {
                 "version": revocation_message["version"],
-                "schema": revocation_message["schema"],
-                "uid": revocation_message["uid"],
+                "schema": formatted_schema,
+                "uid": formatted_uid,
                 "value": revocation_message["value"],
                 "time": revocation_message["time"],
-                "salt": revocation_message["salt"]
+                "salt": formatted_salt
             }
 
             # Create typed data structure
@@ -733,14 +897,18 @@ class EAS:
                 {'name': 'verifyingContract', 'type': 'address'}
             ]
 
-            # Encode and sign the data using eth_defi
-            encoded_data = eip_712.eip712_encode(typed_data)
-            signature = eip_712.eip712_signature(encoded_data, self.private_key)
+            # Encode and sign the data using eth_account
+            from eth_account.messages import encode_typed_data
+            encoded_message = encode_typed_data(full_message=typed_data)
+            
+            # Create account from private key and sign the message
+            account = Account.from_key(self.private_key)
+            signed_message = account.sign_message(encoded_message)
 
             # Convert signature to r, s, v format
-            r = self.w3.to_hex(signature[:32])
-            s = self.w3.to_hex(signature[32:64])
-            v = signature[64]
+            r = hex(signed_message.r)
+            s = hex(signed_message.s)
+            v = signed_message.v
 
             # Build the final revocation object
             offchain_revocation = {

@@ -28,7 +28,7 @@ class TestOffchainRevocation:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
         # Test invalid UID format
         with pytest.raises(EASValidationError, match="Invalid attestation UID format"):
@@ -46,7 +46,7 @@ class TestOffchainRevocation:
         mock_w3.is_connected.return_value = True
         mock_w3.keccak.return_value = b'mock_uid'
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
         message = {
             "version": 0,
@@ -65,25 +65,28 @@ class TestOffchainRevocation:
     @patch('main.EAS.core.web3.Web3')
     @patch('builtins.open', new_callable=lambda: mock_file_content('[]'))
     def test_get_offchain_revocation_uid_version_1(self, mock_open, mock_web3_class):
-        """Test off-chain revocation UID calculation for version 1 - currently blocked by EIP-712 issues."""
+        """Test off-chain revocation UID calculation for version 1 - now works with EIP-712 implementation."""
         mock_w3 = Mock()
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
         message = {
             "version": 1,
-            "schema": "0x0000000000000000000000000000000000000000",
-            "uid": "0xtest",
+            "schema": "0x071de830af40cf7e1035554968b97f9ae2441e8b6a15f02217aa3f46dad85d86",
+            "uid": "0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f",
             "value": 0,
             "time": 1234567890,
-            "salt": "0xsalt"
+            "salt": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         }
         
-        # Should raise NotImplementedError until EIP-712 is fixed (issue #11)
-        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
-            eas.get_offchain_revocation_uid(message, version=1)
+        # Version 1 should now work with EIP-712 implementation
+        uid = eas.get_offchain_revocation_uid(message, version=1)
+        
+        # Should return bytes object
+        assert isinstance(uid, bytes)
+        assert len(uid) == 32  # 32 bytes
     
     @patch('main.EAS.core.web3.Web3')
     @patch('builtins.open', new_callable=lambda: mock_file_content('[]'))
@@ -93,7 +96,7 @@ class TestOffchainRevocation:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
         message = {"uid": "0xtest"}
         
@@ -114,16 +117,24 @@ class TestOffchainRevocation:
         mock_time.return_value = 1234567890
         mock_urandom.return_value = b'salt_bytes_32_length_salt_bytes'
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
-        # Should raise NotImplementedError due to EIP-712 blocking issue #11
-        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
-            eas.revoke_offchain(
-                attestation_uid="0xtest_attestation_uid",
-                schema_uid="0xtest_schema_uid",
+        # Version 1 should now work with EIP-712 implementation
+        # Mock the get_offchain_revocation_uid to return a predictable value
+        with patch.object(eas, 'get_offchain_revocation_uid', return_value=b'mock_uid_32_bytes_long_padded_x'):  
+            result = eas.revoke_offchain(
+                attestation_uid="0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f",
+                schema_uid="0x071de830af40cf7e1035554968b97f9ae2441e8b6a15f02217aa3f46dad85d86", 
                 value=100,
                 reason="Test revocation"
             )
+            
+            # Should return a properly structured revocation
+            assert isinstance(result, dict)
+            assert 'revoker' in result
+            assert 'uid' in result
+            assert 'data' in result
+            assert result['revoker'] == eas.from_account
     
     @patch('main.EAS.core.web3.Web3')
     @patch('builtins.open', new_callable=lambda: mock_file_content('[]'))
@@ -133,11 +144,17 @@ class TestOffchainRevocation:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
         
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 1, "0.26", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
-        # Should raise NotImplementedError due to EIP-712 blocking issue #11
-        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
-            eas.revoke_offchain("0xtest_attestation_uid")
+        # Version 1 should now work with EIP-712 implementation
+        with patch.object(eas, 'get_offchain_revocation_uid', return_value=b'mock_uid_32_bytes_long_padded_x'):
+            result = eas.revoke_offchain("0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f")
+            
+            # Should return a properly structured revocation with defaults
+            assert isinstance(result, dict)
+            assert 'revoker' in result
+            assert 'uid' in result
+            assert 'data' in result
 
 
 @pytest.mark.integration
@@ -153,12 +170,20 @@ class TestOffchainRevocationIntegration:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
         
-        eas = EAS("http://test", "0x1234", 84532, "1.3.0", "0xabcd", "deadbeef" * 8)
+        eas = EAS("http://test", "0x4200000000000000000000000000000000000021", 84532, "1.3.0", "0xcc084F7A8d127C5F56C6293852609c9feE7b27eD", "deadbeef" * 8)
         
         # Mock required methods for integration test
         with patch.object(eas, 'get_offchain_revocation_uid', return_value=b'mock_uid'):
-            with patch('main.EAS.core.eip_712.eip712_encode', return_value=b'encoded_data'):
-                with patch('main.EAS.core.eip_712.eip712_signature', return_value=b'r' * 32 + b's' * 32 + b'\x1c'):
+            # Mock eth_account functions that are now used for EIP-712
+            mock_signable_message = Mock()
+            with patch('eth_account.messages.encode_typed_data', return_value=mock_signable_message):
+                mock_account = Mock()
+                mock_signed_message = Mock()
+                mock_signed_message.r = int('0x' + 'a' * 64, 16) 
+                mock_signed_message.s = int('0x' + 'b' * 64, 16)
+                mock_signed_message.v = 28
+                mock_account.sign_message.return_value = mock_signed_message
+                with patch('eth_account.Account.from_key', return_value=mock_account):
                     with patch('main.EAS.core.os.urandom', return_value=b'salt' * 8):
                         with patch('main.EAS.core.time.time', return_value=1234567890):
                             
@@ -177,7 +202,7 @@ class TestOffchainRevocationIntegration:
                             assert domain['name'] == "EAS Attestation"
                             assert domain['version'] == "1.3.0"
                             assert domain['chainId'] == 84532
-                            assert domain['verifyingContract'] == "0x1234"
+                            assert domain['verifyingContract'] == "0x4200000000000000000000000000000000000021"
                             
                             # Verify types structure
                             types = result['data']['types']
@@ -213,9 +238,14 @@ class TestLiveOffchainRevocation:
         test_attestation_uid = "0x" + "1234567890abcdef" * 8  # 64 hex chars
         test_reason = f"Test revocation - {time.time()}"
         
-        # This should fail with NotImplementedError until EIP-712 is implemented
-        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
-            eas.revoke_offchain("0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f")
+        # This should now work with EIP-712 implementation
+        result = eas.revoke_offchain("0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f")
+        
+        # Should return a properly structured revocation
+        assert isinstance(result, dict)
+        assert 'revoker' in result
+        assert 'uid' in result
+        assert 'data' in result
 
 
 # Helper function to create mock file content for ABI loading
