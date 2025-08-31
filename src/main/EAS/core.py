@@ -773,7 +773,7 @@ class EAS:
             return offchain_revocation
 
         except Exception as e:
-            if isinstance(e, EASValidationError):
+            if isinstance(e, (EASValidationError, NotImplementedError)):
                 raise
                 
             logger.error("offchain_revocation_failed", attestation_uid=attestation_uid, error=str(e))

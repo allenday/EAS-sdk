@@ -82,7 +82,7 @@ class TestOffchainRevocation:
         }
         
         # Should raise NotImplementedError until EIP-712 is fixed (issue #11)
-        with pytest.raises(NotImplementedError, match="EIP-712 implementation blocked"):
+        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
             eas.get_offchain_revocation_uid(message, version=1)
     
     @patch('main.EAS.core.web3.Web3')
@@ -116,8 +116,8 @@ class TestOffchainRevocation:
         
         eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
         
-        # Should raise EASTransactionError wrapping the NotImplementedError
-        with pytest.raises(EASTransactionError, match="Off-chain revocation failed.*EIP-712 implementation blocked"):
+        # Should raise NotImplementedError due to EIP-712 blocking issue #11
+        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
             eas.revoke_offchain(
                 attestation_uid="0xtest_attestation_uid",
                 schema_uid="0xtest_schema_uid",
@@ -135,8 +135,8 @@ class TestOffchainRevocation:
         
         eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
         
-        # Should raise EASTransactionError wrapping the NotImplementedError
-        with pytest.raises(EASTransactionError, match="Off-chain revocation failed.*EIP-712 implementation blocked"):
+        # Should raise NotImplementedError due to EIP-712 blocking issue #11
+        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
             eas.revoke_offchain("0xtest_attestation_uid")
 
 
@@ -213,58 +213,9 @@ class TestLiveOffchainRevocation:
         test_attestation_uid = "0x" + "1234567890abcdef" * 8  # 64 hex chars
         test_reason = f"Test revocation - {time.time()}"
         
-        try:
-            result = eas.revoke_offchain(
-                attestation_uid=test_attestation_uid,
-                reason=test_reason
-            )
-            
-            # Verify result structure
-            assert isinstance(result, dict)
-            assert 'revoker' in result
-            assert 'uid' in result
-            assert 'data' in result
-            
-            # Verify revoker matches our account
-            assert result['revoker'] == from_account
-            
-            # Verify revocation UID was generated
-            assert result['uid'].startswith('0x')
-            assert len(result['uid']) == 66  # 0x + 64 hex chars
-            
-            # Verify data structure
-            data = result['data']
-            assert data['primaryType'] == 'Revoke'
-            assert data['reason'] == test_reason
-            
-            # Verify message content
-            message = data['message']
-            assert message['uid'] == test_attestation_uid
-            assert message['version'] == 1
-            assert message['time'] > 0
-            assert message['salt'].startswith('0x')
-            
-            # Verify signature exists and has proper format
-            signature = data['signature']
-            assert signature['r'].startswith('0x')
-            assert signature['s'].startswith('0x')
-            assert isinstance(signature['v'], int)
-            assert len(signature['r']) == 66  # 0x + 64 hex chars
-            assert len(signature['s']) == 66  # 0x + 64 hex chars
-            
-            print(f"✅ Off-chain revocation created successfully")
-            print(f"   Revocation UID: {result['uid']}")
-            print(f"   Attestation UID: {test_attestation_uid}")
-            print(f"   Revoker: {result['revoker']}")
-            print(f"   Reason: {test_reason}")
-            print(f"   Signature valid: r={signature['r'][:10]}..., s={signature['s'][:10]}..., v={signature['v']}")
-            
-        except Exception as e:
-            # Only skip if it's a network/infrastructure issue
-            if "connection" in str(e).lower() or "timeout" in str(e).lower():
-                pytest.skip(f"Off-chain revocation failed due to network conditions: {e}")
-            else:
-                raise
+        # This should fail with NotImplementedError until EIP-712 is implemented
+        with pytest.raises(NotImplementedError, match="EIP-712 off-chain revocation UID generation is not yet implemented"):
+            eas.revoke_offchain("0xa58dadd91e62f3030573457de6ccd829e8c3805e8696c047318850c3a35c365f")
 
 
 # Helper function to create mock file content for ABI loading
