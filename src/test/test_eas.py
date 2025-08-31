@@ -132,9 +132,10 @@ class TestEAS:
                 private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
             )
 
-            uid = eas.get_offchain_uid(
+            # Version 1 should now work with EIP-712 implementation
+            uid_v1 = eas.get_offchain_uid(
                 version=1,
-                schema="test_schema",
+                schema="0x1234567890123456789012345678901234567890123456789012345678901234",
                 recipient="0x1234567890123456789012345678901234567890",
                 time=1234567890,
                 expiration_time=1234567899,
@@ -142,8 +143,23 @@ class TestEAS:
                 ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
                 data=b"test_data"
             )
-
-            assert uid == "6b656363616b5f68617368"  # hex of b'keccak_hash'
+            
+            # Should return a valid hex string UID
+            assert uid_v1.startswith("0x")
+            assert len(uid_v1) == 66  # 0x + 64 hex characters = 32 bytes
+            
+            # Should be deterministic - same inputs should produce same UID
+            uid_v1_repeat = eas.get_offchain_uid(
+                version=1,
+                schema="0x1234567890123456789012345678901234567890123456789012345678901234",
+                recipient="0x1234567890123456789012345678901234567890",
+                time=1234567890,
+                expiration_time=1234567899,
+                revocable=True,
+                ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
+                data=b"test_data"
+            )
+            assert uid_v1 == uid_v1_repeat
 
     def test_get_offchain_uid_unsupported_version(self, mock_web3, mock_contract):
         """Test get_offchain_uid with unsupported version"""
