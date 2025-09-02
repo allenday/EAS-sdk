@@ -14,6 +14,7 @@ from .exceptions import EASError, EASValidationError, EASTransactionError
 from .transaction import TransactionResult
 from .observability import log_operation, get_logger
 from .schema_registry import SchemaRegistry
+from .security import SecureEnvironmentValidator, ContractAddressValidator, SecurityError
 
 logger = get_logger("eas_core")
 
@@ -43,6 +44,229 @@ class EAS:
 
         # Create contract instances
         self.easContract = self.w3.eth.contract(address=contract_address, abi=eas_abi)
+
+    @classmethod
+    def from_chain(
+        cls,
+        chain_name: str,
+        private_key: str,
+        from_account: str,
+        rpc_url: Optional[str] = None,
+        contract_address: Optional[str] = None,
+        **kwargs
+    ) -> 'EAS':
+        """
+        Create an EAS instance from a chain name with automatic configuration resolution.
+        
+        Args:
+            chain_name: Name of the blockchain network (e.g., 'ethereum', 'base', 'sepolia')
+            private_key: Private key for transaction signing
+            from_account: Account address for transactions
+            rpc_url: Optional custom RPC URL (overrides chain default)
+            contract_address: Optional custom contract address (overrides chain default)
+            **kwargs: Additional arguments passed to EAS constructor
+            
+        Returns:
+            EAS instance configured for the specified chain
+            
+        Raises:
+            ValueError: If chain name is invalid or required parameters are missing
+            TypeError: If parameters have incorrect types
+            ConnectionError: If unable to connect to the network
+            
+        Example:
+            # Using chain defaults
+            eas = EAS.from_chain('ethereum', private_key, from_account)
+            
+            # With custom RPC
+            eas = EAS.from_chain('base', private_key, from_account, 
+                               rpc_url='https://my-custom-base-rpc.com')
+        """
+        from .config import get_network_config, validate_chain_config
+        
+        # Enhanced security validation using SecureEnvironmentValidator
+        try:
+            # Validate all inputs with comprehensive security checks
+            chain_name = SecureEnvironmentValidator.validate_chain_name(chain_name)
+            private_key = SecureEnvironmentValidator.validate_private_key(private_key)
+            from_account = SecureEnvironmentValidator.validate_address(from_account)
+        except SecurityError as e:
+            logger.error("security_validation_failed", error=str(e), field=e.field_name)
+            raise ValueError(f"Security validation failed: {str(e)}")
+        
+        try:
+            # Get chain configuration
+            config = get_network_config(chain_name)
+            validate_chain_config(config, chain_name)
+            
+            # Override with provided parameters
+            final_rpc_url = rpc_url if rpc_url is not None else config['rpc_url']
+            final_contract_address = contract_address if contract_address is not None else config['contract_address']
+            
+            # Validate custom parameters with security checks
+            if rpc_url is not None:
+                try:
+                    final_rpc_url = SecureEnvironmentValidator.validate_rpc_url(rpc_url)
+                except SecurityError as e:
+                    logger.error("rpc_url_validation_failed", error=str(e))
+                    raise ValueError(f"RPC URL validation failed: {str(e)}")
+            
+            if contract_address is not None:
+                try:
+                    final_contract_address = SecureEnvironmentValidator.validate_address(contract_address)
+                    
+                    # Verify against known EAS contracts
+                    if not ContractAddressValidator.is_valid_eas_contract(
+                        final_contract_address, config['chain_id']
+                    ):
+                        logger.warning(
+                            "unknown_contract_address",
+                            address=SecureEnvironmentValidator.sanitize_for_logging(final_contract_address, "address"),
+                            chain_id=config['chain_id']
+                        )
+                        # Allow but warn - don't fail for flexibility
+                        
+                except SecurityError as e:
+                    logger.error("contract_address_validation_failed", error=str(e))
+                    raise ValueError(f"Contract address validation failed: {str(e)}")
+            
+            # Secure logging with sanitized sensitive information
+            logger.info(
+                "creating_eas_from_chain",
+                chain_name=chain_name,
+                chain_id=config['chain_id'],
+                contract_address=SecureEnvironmentValidator.sanitize_for_logging(
+                    final_contract_address, "address"
+                ),
+                from_account=SecureEnvironmentValidator.sanitize_for_logging(
+                    from_account, "address"
+                ),
+                rpc_url=SecureEnvironmentValidator.sanitize_for_logging(
+                    final_rpc_url, "url"
+                ) if final_rpc_url else None,
+                custom_rpc=rpc_url is not None,
+                custom_contract=contract_address is not None
+            )
+            
+            # Create EAS instance
+            return cls(
+                rpc_url=final_rpc_url,
+                contract_address=final_contract_address,
+                chain_id=config['chain_id'],
+                contract_version=config['contract_version'],
+                from_account=from_account,
+                private_key=private_key,
+                **kwargs
+            )
+            
+        except (ValueError, TypeError) as e:
+            logger.error("eas_from_chain_failed", chain_name=chain_name, error=str(e))
+            raise
+        except Exception as e:
+            logger.error("eas_from_chain_unexpected_error", chain_name=chain_name, error=str(e))
+            raise EASError(f"Failed to create EAS instance for chain '{chain_name}': {str(e)}")
+
+    @classmethod
+    def from_environment(cls, **kwargs) -> 'EAS':
+        """
+        Create an EAS instance from environment variables with comprehensive configuration support.
+        
+        Environment Variables:
+            EAS_CHAIN: Chain name (required, e.g., 'ethereum', 'base', 'sepolia')
+            EAS_PRIVATE_KEY: Private key for signing (required)  
+            EAS_FROM_ACCOUNT: Account address for transactions (required)
+            EAS_RPC_URL: Custom RPC URL (optional, overrides chain default)
+            EAS_CONTRACT_ADDRESS: Custom contract address (optional, overrides chain default)
+            
+        Args:
+            **kwargs: Additional arguments passed to EAS constructor
+            
+        Returns:
+            EAS instance configured from environment variables
+            
+        Raises:
+            ValueError: If required environment variables are missing or invalid
+            TypeError: If environment variables have incorrect format
+            ConnectionError: If unable to connect to the network
+            
+        Example:
+            # Set environment variables
+            export EAS_CHAIN=ethereum
+            export EAS_PRIVATE_KEY=0x1234...
+            export EAS_FROM_ACCOUNT=0xabcd...
+            
+            # Create EAS instance
+            eas = EAS.from_environment()
+        """
+        # Required environment variables
+        required_env_vars = {
+            'EAS_CHAIN': 'chain name',
+            'EAS_PRIVATE_KEY': 'private key', 
+            'EAS_FROM_ACCOUNT': 'from account address'
+        }
+        
+        # Use comprehensive batch environment variable validation
+        required_env_types = {
+            'EAS_CHAIN': 'chain_name',
+            'EAS_PRIVATE_KEY': 'private_key',
+            'EAS_FROM_ACCOUNT': 'address'
+        }
+        
+        optional_env_types = {
+            'EAS_RPC_URL': 'rpc_url',
+            'EAS_CONTRACT_ADDRESS': 'address'
+        }
+        
+        try:
+            env_values = SecureEnvironmentValidator.validate_all_environment_variables(
+                required_vars=required_env_types,
+                optional_vars=optional_env_types
+            )
+        except (SecurityError, ValueError) as e:
+            logger.error("environment_validation_failed", error=str(e))
+            raise ValueError(f"Environment variable validation failed: {str(e)}")
+        
+        chain_name = env_values['EAS_CHAIN']
+        private_key = env_values['EAS_PRIVATE_KEY']
+        from_account = env_values['EAS_FROM_ACCOUNT']
+        rpc_url = env_values.get('EAS_RPC_URL')
+        contract_address = env_values.get('EAS_CONTRACT_ADDRESS')
+        
+        # Secure logging for environment-based creation
+        logger.info(
+            "creating_eas_from_environment",
+            chain_name=chain_name,
+            from_account=SecureEnvironmentValidator.sanitize_for_logging(
+                from_account, "address"
+            ),
+            rpc_url=SecureEnvironmentValidator.sanitize_for_logging(
+                rpc_url, "url"
+            ) if rpc_url else None,
+            has_custom_rpc=rpc_url is not None,
+            has_custom_contract=contract_address is not None
+        )
+        
+        try:
+            # Use from_chain method with environment variable values
+            return cls.from_chain(
+                chain_name=chain_name,
+                private_key=private_key,
+                from_account=from_account,
+                rpc_url=rpc_url,
+                contract_address=contract_address,
+                **kwargs
+            )
+            
+        except Exception as e:
+            logger.error(
+                "eas_from_environment_failed", 
+                chain_name=chain_name,
+                from_account=SecureEnvironmentValidator.sanitize_for_logging(
+                    from_account, "address"
+                ) if from_account else None,
+                error=str(e)
+            )
+            raise EASError(f"Failed to create EAS instance from environment: {str(e)}")
 
     def get_attestation(self, uid):
         """Get an attestation by UID."""
@@ -288,10 +512,16 @@ class EAS:
         Returns:
             TransactionResult with revocation transaction details
         """
-        if not uid or not uid.startswith('0x'):
-            raise EASValidationError("Invalid attestation UID format", field_name="uid", field_value=uid)
+        # Validate UID format securely
+        try:
+            uid = SecureEnvironmentValidator.validate_schema_uid(uid)
+        except SecurityError as e:
+            raise EASValidationError(f"Invalid attestation UID: {str(e)}", field_name="uid", field_value=uid)
         
-        logger.info("attestation_revocation_started", attestation_uid=uid)
+        logger.info(
+            "attestation_revocation_started", 
+            attestation_uid=SecureEnvironmentValidator.sanitize_for_logging(uid, "uid")
+        )
         
         try:
             # Build revocation request
@@ -317,7 +547,11 @@ class EAS:
             tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
             tx_hash_hex = tx_hash.hex()
             
-            logger.info("attestation_revocation_submitted", tx_hash=tx_hash_hex, attestation_uid=uid)
+            logger.info(
+                "attestation_revocation_submitted", 
+                tx_hash=SecureEnvironmentValidator.sanitize_for_logging(tx_hash_hex, "transaction_hash"),
+                attestation_uid=SecureEnvironmentValidator.sanitize_for_logging(uid, "uid")
+            )
             
             # Wait for confirmation
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -332,8 +566,8 @@ class EAS:
             
             logger.info(
                 "attestation_revocation_completed",
-                tx_hash=tx_hash_hex,
-                attestation_uid=uid,
+                tx_hash=SecureEnvironmentValidator.sanitize_for_logging(tx_hash_hex, "transaction_hash"),
+                attestation_uid=SecureEnvironmentValidator.sanitize_for_logging(uid, "uid"),
                 gas_used=receipt.get('gasUsed'),
                 block_number=receipt.get('blockNumber')
             )
@@ -344,7 +578,11 @@ class EAS:
             if isinstance(e, (EASValidationError, EASTransactionError)):
                 raise
                 
-            logger.error("attestation_revocation_failed", attestation_uid=uid, error=str(e))
+            logger.error(
+                "attestation_revocation_failed", 
+                attestation_uid=SecureEnvironmentValidator.sanitize_for_logging(uid, "uid"),
+                error=str(e)
+            )
             raise EASTransactionError(f"Attestation revocation failed: {str(e)}")
 
     @log_operation("batch_revocation")
@@ -453,16 +691,25 @@ class EAS:
         Returns:
             TransactionResult with attestation transaction details
         """
-        if not schema_uid or not schema_uid.startswith('0x'):
-            raise EASValidationError("Invalid schema UID format", field_name="schema_uid", field_value=schema_uid)
+        # Validate inputs with security checks
+        try:
+            schema_uid = SecureEnvironmentValidator.validate_schema_uid(schema_uid)
+        except SecurityError as e:
+            raise EASValidationError(f"Invalid schema UID: {str(e)}", field_name="schema_uid", field_value=schema_uid)
         
-        if not recipient or not recipient.startswith('0x'):
-            raise EASValidationError("Invalid recipient address format", field_name="recipient", field_value=recipient)
+        try:
+            recipient = SecureEnvironmentValidator.validate_address(recipient)
+        except SecurityError as e:
+            raise EASValidationError(f"Invalid recipient address: {str(e)}", field_name="recipient", field_value=recipient)
             
         if not encoded_data:
             raise EASValidationError("Encoded data cannot be empty", field_name="encoded_data")
         
-        logger.info("attestation_creation_started", schema_uid=schema_uid, recipient=recipient)
+        logger.info(
+            "attestation_creation_started", 
+            schema_uid=SecureEnvironmentValidator.sanitize_for_logging(schema_uid, "schema_uid"),
+            recipient=SecureEnvironmentValidator.sanitize_for_logging(recipient, "address")
+        )
         
         try:
             # Build attestation request
@@ -495,7 +742,12 @@ class EAS:
             tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
             tx_hash_hex = tx_hash.hex()
             
-            logger.info("attestation_creation_submitted", tx_hash=tx_hash_hex, schema_uid=schema_uid, recipient=recipient)
+            logger.info(
+                "attestation_creation_submitted", 
+                tx_hash=SecureEnvironmentValidator.sanitize_for_logging(tx_hash_hex, "transaction_hash"),
+                schema_uid=SecureEnvironmentValidator.sanitize_for_logging(schema_uid, "schema_uid"),
+                recipient=SecureEnvironmentValidator.sanitize_for_logging(recipient, "address")
+            )
             
             # Wait for confirmation
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -510,9 +762,9 @@ class EAS:
             
             logger.info(
                 "attestation_creation_completed",
-                tx_hash=tx_hash_hex,
-                schema_uid=schema_uid,
-                recipient=recipient,
+                tx_hash=SecureEnvironmentValidator.sanitize_for_logging(tx_hash_hex, "transaction_hash"),
+                schema_uid=SecureEnvironmentValidator.sanitize_for_logging(schema_uid, "schema_uid"),
+                recipient=SecureEnvironmentValidator.sanitize_for_logging(recipient, "address"),
                 gas_used=receipt.get('gasUsed'),
                 block_number=receipt.get('blockNumber')
             )
@@ -523,7 +775,12 @@ class EAS:
             if isinstance(e, (EASValidationError, EASTransactionError)):
                 raise
                 
-            logger.error("attestation_creation_failed", schema_uid=schema_uid, recipient=recipient, error=str(e))
+            logger.error(
+                "attestation_creation_failed", 
+                schema_uid=SecureEnvironmentValidator.sanitize_for_logging(schema_uid, "schema_uid"),
+                recipient=SecureEnvironmentValidator.sanitize_for_logging(recipient, "address"),
+                error=str(e)
+            )
             raise EASTransactionError(f"Attestation creation failed: {str(e)}")
 
     @log_operation("timestamping")

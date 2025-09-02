@@ -34,7 +34,8 @@ class TestExceptions:
         
         assert "Invalid address" in str(error)
         assert error.context['field_name'] == "recipient"
-        assert error.context['field_value'] == "0xinvalid"
+        # Security: field_value is now sanitized for security (short addresses become [ADDR_TOO_SHORT])
+        assert error.context['field_value'] == "[ADDR_TOO_SHORT]"
     
     def test_transaction_error(self):
         """Test transaction error with blockchain context."""
