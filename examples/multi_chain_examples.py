@@ -2,8 +2,8 @@
 """
 Multi-Chain EAS SDK Usage Examples
 
-This script demonstrates how to use the enhanced EAS Python SDK with comprehensive 
-multi-chain support, including the new factory methods and configuration system.
+This script demonstrates how to use the EAS Python SDK with comprehensive 
+multi-chain support, including the factory methods and configuration system.
 """
 
 import os
@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'main'))
 
 def demonstrate_config_system():
-    """Demonstrate the enhanced configuration system."""
+    """Demonstrate the configuration system."""
     print("=" * 70)
     print("📋 CONFIGURATION SYSTEM EXAMPLES")
     print("=" * 70)
@@ -61,7 +61,7 @@ def demonstrate_config_system():
     print()
 
 def demonstrate_factory_methods():
-    """Demonstrate the new factory methods (concept only due to dependencies)."""
+    """Demonstrate the factory methods (concept only due to dependencies)."""
     print("=" * 70)
     print("🏭 FACTORY METHODS EXAMPLES")
     print("=" * 70)
@@ -118,7 +118,7 @@ def demonstrate_factory_methods():
     print()
 
 def demonstrate_migration_guide():
-    """Show how to migrate from old to new multi-chain support."""
+    """Show how to migrate from old to current multi-chain support."""
     print("=" * 70)
     print("🔄 MIGRATION GUIDE")
     print("=" * 70)
@@ -135,9 +135,9 @@ def demonstrate_migration_guide():
    )
     """)
     
-    print("AFTER (comprehensive multi-chain support):")
+    print("CURRENT APPROACH (comprehensive multi-chain support):")
     print("""
-   # New way - supports all EAS-deployed chains
+   # Current way - supports all EAS-deployed chains
    from EAS.core import EAS
    
    # Method 1: Direct chain specification
@@ -160,7 +160,7 @@ def demonstrate_migration_guide():
    )
     """)
     
-    print("BENEFITS of the new approach:")
+    print("BENEFITS of this approach:")
     print("✓ Support for 12+ chains (all major EAS deployments)")
     print("✓ Automatic contract address resolution")
     print("✓ Environment variable support")
@@ -204,8 +204,8 @@ def main():
     """Run all demonstrations."""
     print("🚀 EAS PYTHON SDK - MULTI-CHAIN SUPPORT DEMONSTRATION")
     print("=" * 70)
-    print("This script demonstrates the new comprehensive multi-chain support")
-    print("added to the EAS Python SDK, including factory methods and enhanced")
+    print("This script demonstrates the comprehensive multi-chain support")
+    print("provided by the EAS Python SDK, including factory methods and")
     print("configuration management.")
     print()
     
@@ -215,9 +215,9 @@ def main():
     demonstrate_supported_chains()
     
     print("=" * 70)
-    print("🎉 MULTI-CHAIN SUPPORT SUCCESSFULLY IMPLEMENTED!")
+    print("🎉 MULTI-CHAIN SUPPORT AVAILABLE!")
     print("=" * 70)
-    print("The EAS Python SDK now supports:")
+    print("The EAS Python SDK supports:")
     print("✅ 12+ blockchain networks (all major EAS deployments)")
     print("✅ Automatic contract address resolution") 
     print("✅ Factory methods for easy instantiation")

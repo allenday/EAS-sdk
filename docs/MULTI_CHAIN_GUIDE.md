@@ -1,10 +1,10 @@
 # EAS Python SDK - Multi-Chain Support Guide
 
-The EAS Python SDK now includes comprehensive multi-chain support with **enhanced security features**, enabling you to interact with EAS contracts across all major blockchain networks where EAS is deployed.
+The EAS Python SDK provides comprehensive multi-chain support with **security features**, enabling you to interact with EAS contracts across all major blockchain networks where EAS is deployed.
 
 ## ⚠️ SECURITY NOTICE
 
-**This SDK now includes comprehensive security validation to protect against common attack vectors including environment variable injection, weak private keys, malicious RPC endpoints, and information disclosure. All examples in this guide use placeholder values - NEVER use example private keys or addresses in production!**
+**This SDK includes comprehensive security validation to protect against common attack vectors including environment variable injection, weak private keys, malicious RPC endpoints, and information disclosure. All examples in this guide use placeholder values - NEVER use example private keys or addresses in production!**
 
 ## 🌐 Supported Networks
 
@@ -163,10 +163,10 @@ eas = create_eas_instance(
 )
 ```
 
-### To New Multi-Chain SDK (12+ networks)
+### To Multi-Chain SDK (12+ networks)
 
 ```python
-# NEW WAY - Supports all EAS-deployed chains
+# CURRENT WAY - Supports all EAS-deployed chains
 from EAS.core import EAS
 
 # Method 1: Direct chain specification
@@ -321,7 +321,7 @@ except SecurityError as e:
 
 ## 🛡️ Error Handling
 
-The new multi-chain system includes comprehensive error handling with security awareness:
+The multi-chain system includes comprehensive error handling with security awareness:
 
 ```python
 from EAS.core import EAS
@@ -447,4 +447,4 @@ for chain, rpc_url in custom_rpcs.items():
    attestation = eas.create_attestation(...)
    ```
 
-The EAS Python SDK now provides seamless multi-chain support while maintaining full backward compatibility. Start building cross-chain attestation applications today!
+The EAS Python SDK provides seamless multi-chain support while maintaining full backward compatibility. Start building cross-chain attestation applications today!
