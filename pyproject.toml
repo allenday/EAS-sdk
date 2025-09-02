@@ -27,7 +27,6 @@ classifiers = [
 dependencies = [
     "protobuf>=6.32.0",
     "web3>=6.14.0",
-    "web3-ethereum-defi>=0.32",
     "jsonschema>=4.25.1",
     "eth-abi>=5.2.0",
     "python-dotenv",
