@@ -44,7 +44,8 @@ class TestExceptions:
         
         error = EASTransactionError("Transaction failed", tx_hash=tx_hash, receipt=receipt)
         
-        assert error.context['tx_hash'] == tx_hash
+        # Security: tx_hash is now sanitized for security (short hashes become [TX_HASH])
+        assert error.context['tx_hash'] == "[TX_HASH]"
         assert error.context['gas_used'] == 50000
         assert error.context['block_number'] == 12345
 
@@ -136,7 +137,8 @@ class TestFoundationIntegration:
             network_name="base-sepolia"
         )
         
-        assert error.context['rpc_url'] == rpc_url
+        # Security: rpc_url is now sanitized for security (URLs get truncated to prevent API key exposure)
+        assert error.context['rpc_url'] == "https://sepolia.base.org/..."
         assert error.context['network_name'] == "base-sepolia"
     
     def test_transaction_error_context_preservation(self):
@@ -154,7 +156,8 @@ class TestFoundationIntegration:
         
         # Verify context is preserved through the error chain
         assert result.error == error
-        assert error.context['tx_hash'] == tx_hash
+        # Security: tx_hash is now sanitized for security (long hashes are truncated)
+        assert error.context['tx_hash'] == "0xaaaaaaaa...aaaaaa"
         assert error.context['gas_used'] == 100000
 
 
