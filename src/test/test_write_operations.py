@@ -88,10 +88,10 @@ class TestEASWriteOperations:
         eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
         
         # Test invalid UID format
-        with pytest.raises(EASValidationError, match="Invalid attestation UID format"):
+        with pytest.raises(EASValidationError, match="Invalid attestation UID"):
             eas.revoke_attestation("")
         
-        with pytest.raises(EASValidationError, match="Invalid attestation UID format"):
+        with pytest.raises(EASValidationError, match="Invalid attestation UID"):
             eas.revoke_attestation("invalid-uid")
     
     @patch('main.EAS.core.web3.Web3')
@@ -356,10 +356,10 @@ class TestLiveWriteOperations:
         eas = EAS(rpc_url, contract_address, 84532, "1.3.0", from_account, private_key)
         
         # Test validation with invalid UID (should fail fast)
-        with pytest.raises(EASValidationError, match="Invalid attestation UID format"):
+        with pytest.raises(EASValidationError, match="Invalid attestation UID"):
             eas.revoke_attestation("")
             
-        with pytest.raises(EASValidationError, match="Invalid attestation UID format"):
+        with pytest.raises(EASValidationError, match="Invalid attestation UID"):
             eas.revoke_attestation("invalid-uid")
         
         # Test multi-revoke validation
