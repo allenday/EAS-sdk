@@ -27,3 +27,8 @@ print("Mainnet Chains:", mainnet_chains)
 base_config = EAS.get_network_config("base")
 print("Base Network Config:", base_config)
 ```
+
+## Documentation
+
+- **[Multi-Chain Guide](docs/MULTI_CHAIN_GUIDE.md)** - Comprehensive guide for configuring and using multi-chain functionality
+- **[Multi-Chain Examples](examples/multi_chain_examples.py)** - Practical examples of factory methods and multi-chain usage
