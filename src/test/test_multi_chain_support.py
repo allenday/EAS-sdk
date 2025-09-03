@@ -203,8 +203,14 @@ class TestMultiChainSupport:
         with pytest.raises(ValueError, match="Missing required environment variables"):
             EAS.from_environment()
 
-    def test_backward_compatibility_factory_method(self):
+    @patch("main.EAS.core.web3.Web3")
+    def test_backward_compatibility_factory_method(self, mock_web3_class):
         """Test that original create_eas_instance() works with new multi-chain support"""
+        # Mock web3 connection
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3_class.return_value = mock_w3
+
         from main.EAS.config import create_eas_instance
 
         # Test with legacy network names (excluding deprecated ones that may fail security checks)
