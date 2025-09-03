@@ -6,7 +6,10 @@ Provides CLI tools for interacting with Ethereum Attestation Service.
 """
 
 import json
+import os
+import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, Union, cast
 
 import click
@@ -764,6 +767,308 @@ def encode_schema(
 def generate_schema(schema_uid: str, output_format: str, network: str) -> None:
     """Generate code from EAS schema definition."""
     generate_schema_impl(schema_uid, output_format, network)
+
+
+# Development Commands
+def get_venv_python() -> str:
+    """Get path to virtual environment Python."""
+    venv_path = Path(".venv")
+    if os.name == "nt":
+        python_path = venv_path / "Scripts" / "python.exe"
+    else:
+        python_path = venv_path / "bin" / "python"
+
+    if python_path.exists():
+        return str(python_path)
+
+    return sys.executable
+
+
+def run_command(
+    cmd: list[str], description: str = "Running command", check: bool = True
+) -> bool:
+    """Run a command with nice output."""
+    console.print(f"🔧 {description}...")
+    console.print(f"   Command: {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, check=check)
+        if result.returncode == 0:
+            console.print(f"   ✅ {description} completed")
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError as e:
+        console.print(f"   ❌ {description} failed with code {e.returncode}")
+        return False
+    except FileNotFoundError:
+        console.print(f"   ❌ Command not found: {cmd[0]}")
+        return False
+
+
+@main.group()
+def dev() -> None:
+    """Development commands for EAS SDK."""
+    pass
+
+
+@dev.command()
+def setup() -> None:
+    """Set up development environment."""
+    console.print("🚀 EAS SDK Development Setup")
+    console.print("=" * 30)
+
+    # Check if we're in a virtual environment
+    if hasattr(sys, "real_prefix") or (
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+    ):
+        console.print("✅ Virtual environment detected")
+    else:
+        console.print("⚠️  No virtual environment detected. Consider using:")
+        console.print("   python -m venv .venv")
+        console.print("   source .venv/bin/activate  # Linux/Mac")
+        console.print("   .venv\\Scripts\\activate     # Windows")
+
+    # Install development dependencies
+    python = get_venv_python()
+    console.print("📦 Installing development dependencies...")
+    success = run_command(
+        [python, "-m", "pip", "install", "-e", ".[dev]"], "Installing dev dependencies"
+    )
+
+    if success:
+        console.print("✅ Development environment ready!")
+        console.print("\n🎯 Next steps:")
+        console.print("   • Copy env.example to .env and configure")
+        console.print("   • Run: eas-tools dev test")
+        console.print("   • Run: eas-tools dev example quick-start")
+    else:
+        console.print("❌ Setup failed")
+        sys.exit(1)
+
+
+@dev.command()
+@click.argument(
+    "test_type", type=click.Choice(["unit", "integration", "all"]), default="unit"
+)
+def test(test_type: str) -> None:
+    """Run tests with smart selection."""
+    python = get_venv_python()
+
+    # Check if Task is available
+    if Path("Taskfile.yml").exists():
+        try:
+            if test_type == "unit":
+                cmd = ["task", "test:unit"]
+            elif test_type == "integration":
+                cmd = ["task", "test:integration"]
+            elif test_type == "all":
+                cmd = ["task", "test:all"]
+            else:
+                cmd = ["task", "test:unit"]  # Default
+
+            success = run_command(cmd, f"Running {test_type} tests")
+            if not success:
+                sys.exit(1)
+            return
+        except Exception:
+            pass
+
+    # Fallback to direct pytest
+    cmd = [python, "-m", "pytest", "-v"]
+    if test_type == "unit":
+        cmd.extend(["-m", "not requires_network and not requires_private_key"])
+    elif test_type == "integration":
+        cmd.extend(["-m", "integration and not requires_private_key"])
+
+    cmd.append("src/test")
+    success = run_command(cmd, f"Running {test_type} tests")
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+def format() -> None:
+    """Format code."""
+    python = get_venv_python()
+
+    if Path("Taskfile.yml").exists():
+        success = run_command(["task", "format"], "Formatting code")
+        if not success:
+            sys.exit(1)
+        return
+
+    # Fallback to direct commands
+    success = True
+    success &= run_command([python, "-m", "black", "src"], "Running black")
+    success &= run_command([python, "-m", "isort", "src"], "Running isort")
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+def check() -> None:
+    """Run all code quality checks."""
+    if Path("Taskfile.yml").exists():
+        success = run_command(["task", "check"], "Running all checks")
+        if not success:
+            sys.exit(1)
+        return
+
+    python = get_venv_python()
+    success = True
+    success &= run_command(
+        [python, "-m", "black", "--check", "src"], "Checking formatting"
+    )
+    success &= run_command([python, "-m", "flake8", "src"], "Running linter")
+    success &= run_command([python, "-m", "mypy", "src/main"], "Running type checker")
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+@click.option("--mainnet", is_flag=True, help="Show only mainnet chains")
+@click.option("--testnet", is_flag=True, help="Show only testnet chains")
+def chains(mainnet: bool, testnet: bool) -> None:
+    """List supported chains."""
+    python = get_venv_python()
+
+    if testnet:
+        filter_cmd = (
+            "testnet_chains = get_testnet_chains(); print('\\n'.join(testnet_chains))"
+        )
+    elif mainnet:
+        filter_cmd = (
+            "mainnet_chains = get_mainnet_chains(); print('\\n'.join(mainnet_chains))"
+        )
+    else:
+        filter_cmd = (
+            "all_chains = list_supported_chains(); print('\\n'.join(all_chains))"
+        )
+
+    cmd = [
+        python,
+        "-c",
+        f"from EAS import list_supported_chains, get_mainnet_chains, get_testnet_chains; {filter_cmd}",
+    ]
+
+    success = run_command(cmd, "Listing supported chains", check=False)
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+@click.argument("name", type=click.Choice(["quick-start", "full", "multi-chain"]))
+def example(name: str) -> None:
+    """Run example scripts."""
+    python = get_venv_python()
+
+    examples = {
+        "quick-start": "examples/quick_start.py",
+        "full": "examples/full_example.py",
+        "multi-chain": "examples/multi_chain_examples.py",
+    }
+
+    example_path = examples[name]
+    if not Path(example_path).exists():
+        console.print(f"❌ Example file not found: {example_path}")
+        sys.exit(1)
+
+    cmd = [python, example_path]
+    success = run_command(cmd, f"Running {name} example")
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+def clean() -> None:
+    """Clean build artifacts."""
+    if Path("Taskfile.yml").exists():
+        success = run_command(["task", "clean"], "Cleaning artifacts")
+        if not success:
+            sys.exit(1)
+        return
+
+    # Manual cleanup
+    import shutil
+
+    patterns = [
+        "build",
+        "dist",
+        "*.egg-info",
+        ".pytest_cache",
+        "__pycache__",
+        ".coverage",
+        "htmlcov",
+    ]
+
+    for pattern in patterns:
+        for path in Path(".").glob(pattern):
+            if path.is_dir():
+                shutil.rmtree(path)
+                console.print(f"   🗑️  Removed directory: {path}")
+            else:
+                path.unlink()
+                console.print(f"   🗑️  Removed file: {path}")
+
+    console.print("   ✅ Clean completed")
+
+
+@dev.command()
+def build() -> None:
+    """Build the package."""
+    if Path("Taskfile.yml").exists():
+        success = run_command(["task", "build"], "Building package")
+        if not success:
+            sys.exit(1)
+        return
+
+    python = get_venv_python()
+    success = run_command([python, "-m", "build"], "Building package")
+    if not success:
+        sys.exit(1)
+
+
+@dev.command()
+def shell() -> None:
+    """Start interactive shell with EAS imported."""
+    python = get_venv_python()
+
+    startup_code = """
+import sys
+print("🚀 EAS SDK Interactive Shell")
+print("="*30)
+
+try:
+    from EAS import EAS, list_supported_chains, get_network_config
+    print("✅ EAS SDK imported successfully")
+    print()
+    print("Available objects:")
+    print("  • EAS - Main EAS class")
+    print("  • list_supported_chains() - List all chains")
+    print("  • get_network_config(chain) - Get chain config")
+    print()
+    print("Quick start:")
+    print("  chains = list_supported_chains()")
+    print("  eas = EAS.from_environment()  # Requires .env setup")
+    print()
+except ImportError as e:
+    print(f"❌ Failed to import EAS SDK: {e}")
+    print("   Make sure you've run: eas-tools dev setup")
+"""
+
+    # Write startup script to temp file
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(startup_code)
+        startup_file = f.name
+
+    try:
+        cmd = [python, "-i", startup_file]
+        subprocess.run(cmd)
+    finally:
+        os.unlink(startup_file)
 
 
 if __name__ == "__main__":
