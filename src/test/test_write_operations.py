@@ -41,7 +41,12 @@ class TestSchemaRegistry:
         mock_w3 = Mock()
         mock_w3.eth.contract.return_value = Mock()
 
-        registry = SchemaRegistry(mock_w3, "0x1234567890123456789012345678901234567890", "0xabcd", "deadbeef" * 8)
+        registry = SchemaRegistry(
+            mock_w3,
+            "0x1234567890123456789012345678901234567890",
+            "0xabcd",
+            "deadbeef" * 8,
+        )
 
         # Should not raise for valid schema
         registry._validate_schema_format("uint256 id,string name")
@@ -52,7 +57,12 @@ class TestSchemaRegistry:
         mock_w3 = Mock()
         mock_w3.eth.contract.return_value = Mock()
 
-        registry = SchemaRegistry(mock_w3, "0x1234567890123456789012345678901234567890", "0xabcd", "deadbeef" * 8)
+        registry = SchemaRegistry(
+            mock_w3,
+            "0x1234567890123456789012345678901234567890",
+            "0xabcd",
+            "deadbeef" * 8,
+        )
 
         # Should raise for invalid schemas
         with pytest.raises(EASValidationError, match="cannot be empty"):

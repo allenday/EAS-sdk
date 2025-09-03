@@ -216,7 +216,7 @@ class TestMultiChainSupport:
                 eas = create_eas_instance(
                     network,
                     from_account="0x1234567890123456789012345678901234567890",
-                    private_key="deadbeef" * 8
+                    private_key="deadbeef" * 8,
                 )
 
                 assert eas.chain_id is not None
