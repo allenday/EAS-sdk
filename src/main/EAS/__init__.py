@@ -14,7 +14,7 @@ from .exceptions import (
     EASError,
     EASTransactionError,
     EASValidationError,
-    SecurityError,
+    EASSecurityError,
 )
 
 # Import transaction result type
@@ -37,7 +37,7 @@ __all__ = [
     "EASError",
     "EASValidationError",
     "EASTransactionError",
-    "SecurityError",
+    "EASSecurityError",
     # Types
     "TransactionResult",
     # Version

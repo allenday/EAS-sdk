@@ -770,7 +770,7 @@ def generate_schema(schema_uid: str, output_format: str, network: str) -> None:
 
 
 # Development Commands
-def get_venv_python():
+def get_venv_python() -> str:
     """Get path to virtual environment Python."""
     venv_path = Path(".venv")
     if os.name == "nt":
@@ -784,7 +784,7 @@ def get_venv_python():
     return sys.executable
 
 
-def run_command(cmd, description="Running command", check=True):
+def run_command(cmd: list[str], description: str = "Running command", check: bool = True) -> bool:
     """Run a command with nice output."""
     console.print(f"🔧 {description}...")
     console.print(f"   Command: {' '.join(cmd)}")
@@ -793,7 +793,9 @@ def run_command(cmd, description="Running command", check=True):
         result = subprocess.run(cmd, check=check)
         if result.returncode == 0:
             console.print(f"   ✅ {description} completed")
-        return result.returncode == 0
+            return True
+        else:
+            return False
     except subprocess.CalledProcessError as e:
         console.print(f"   ❌ {description} failed with code {e.returncode}")
         return False
@@ -803,13 +805,13 @@ def run_command(cmd, description="Running command", check=True):
 
 
 @main.group()
-def dev():
+def dev() -> None:
     """Development commands for EAS SDK."""
     pass
 
 
 @dev.command()
-def setup():
+def setup() -> None:
     """Set up development environment."""
     console.print("🚀 EAS SDK Development Setup")
     console.print("=" * 30)
@@ -847,7 +849,7 @@ def setup():
 @click.argument(
     "test_type", type=click.Choice(["unit", "integration", "all"]), default="unit"
 )
-def test(test_type: str):
+def test(test_type: str) -> None:
     """Run tests with smart selection."""
     python = get_venv_python()
 
@@ -884,7 +886,7 @@ def test(test_type: str):
 
 
 @dev.command()
-def format():
+def format() -> None:
     """Format code."""
     python = get_venv_python()
 
@@ -903,7 +905,7 @@ def format():
 
 
 @dev.command()
-def check():
+def check() -> None:
     """Run all code quality checks."""
     if Path("Taskfile.yml").exists():
         success = run_command(["task", "check"], "Running all checks")
@@ -925,7 +927,7 @@ def check():
 @dev.command()
 @click.option("--mainnet", is_flag=True, help="Show only mainnet chains")
 @click.option("--testnet", is_flag=True, help="Show only testnet chains")
-def chains(mainnet: bool, testnet: bool):
+def chains(mainnet: bool, testnet: bool) -> None:
     """List supported chains."""
     python = get_venv_python()
 
@@ -955,7 +957,7 @@ def chains(mainnet: bool, testnet: bool):
 
 @dev.command()
 @click.argument("name", type=click.Choice(["quick-start", "full", "multi-chain"]))
-def example(name: str):
+def example(name: str) -> None:
     """Run example scripts."""
     python = get_venv_python()
 
@@ -977,7 +979,7 @@ def example(name: str):
 
 
 @dev.command()
-def clean():
+def clean() -> None:
     """Clean build artifacts."""
     if Path("Taskfile.yml").exists():
         success = run_command(["task", "clean"], "Cleaning artifacts")
@@ -1011,7 +1013,7 @@ def clean():
 
 
 @dev.command()
-def build():
+def build() -> None:
     """Build the package."""
     if Path("Taskfile.yml").exists():
         success = run_command(["task", "build"], "Building package")
@@ -1026,7 +1028,7 @@ def build():
 
 
 @dev.command()
-def shell():
+def shell() -> None:
     """Start interactive shell with EAS imported."""
     python = get_venv_python()
 
