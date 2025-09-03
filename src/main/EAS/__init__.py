@@ -12,9 +12,9 @@ from .core import EAS
 # Import exceptions for better error handling
 from .exceptions import (
     EASError,
+    EASSecurityError,
     EASTransactionError,
     EASValidationError,
-    EASSecurityError,
 )
 
 # Import transaction result type

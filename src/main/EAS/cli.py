@@ -784,7 +784,9 @@ def get_venv_python() -> str:
     return sys.executable
 
 
-def run_command(cmd: list[str], description: str = "Running command", check: bool = True) -> bool:
+def run_command(
+    cmd: list[str], description: str = "Running command", check: bool = True
+) -> bool:
     """Run a command with nice output."""
     console.print(f"🔧 {description}...")
     console.print(f"   Command: {' '.join(cmd)}")

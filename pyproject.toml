@@ -63,13 +63,13 @@ Documentation = "https://github.com/allenday/EAS-sdk#readme"
 "Bug Tracker" = "https://github.com/allenday/EAS-sdk/issues"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src/main"]
 
 [tool.setuptools.package-data]
 "EAS" = ["*.json"]
 
 [project.scripts]
-eas-tools = "main.EAS.cli:main"
+eas-tools = "EAS.cli:main"
 
 [tool.black]
 line-length = 88
