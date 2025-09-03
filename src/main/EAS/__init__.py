@@ -1,20 +1,19 @@
 # Import the main EAS class and commonly used utilities
-from .core import EAS
-
 # Import configuration helpers and common functions
 from . import config
 from .config import (
-    get_network_config,
-    list_supported_chains,
     get_mainnet_chains,
+    get_network_config,
     get_testnet_chains,
+    list_supported_chains,
 )
+from .core import EAS
 
 # Import exceptions for better error handling
 from .exceptions import (
     EASError,
-    EASValidationError,
     EASTransactionError,
+    EASValidationError,
     SecurityError,
 )
 
@@ -28,23 +27,19 @@ __version__ = "0.1.0"
 __all__ = [
     # Main class
     "EAS",
-    
     # Configuration
     "config",
     "get_network_config",
-    "list_supported_chains", 
+    "list_supported_chains",
     "get_mainnet_chains",
     "get_testnet_chains",
-    
     # Exceptions
     "EASError",
-    "EASValidationError", 
+    "EASValidationError",
     "EASTransactionError",
     "SecurityError",
-    
     # Types
     "TransactionResult",
-    
     # Version
     "__version__",
 ]
