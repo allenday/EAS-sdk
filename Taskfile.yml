@@ -2,6 +2,7 @@ version: '3'
 
 vars:
   PYTHON: '{{.PYTHON | default "python3"}}'
+  VENV_PYTHON: '{{.VENV_DIR | default ".venv"}}/bin/python'
   VENV_DIR: '{{.VENV_DIR | default ".venv"}}'
   SOURCE_DIR: 'src'
   TEST_DIR: 'src/test'
@@ -57,41 +58,41 @@ tasks:
     deps: [install]
     cmds:
       - echo "🧪 Running unit tests..."
-      - '{{.PYTHON}} -m pytest -v -m "not requires_network and not requires_private_key" {{.TEST_DIR}}'
+      - '{{.VENV_PYTHON}} -m pytest -v -m "not requires_network and not requires_private_key" {{.TEST_DIR}}'
 
   test:integration:
     desc: Run integration tests (network required)
     deps: [install]
     cmds:
       - echo "🌐 Running integration tests..."
-      - '{{.PYTHON}} -m pytest -v -m "requires_network and not requires_private_key" {{.TEST_DIR}}'
+      - '{{.VENV_PYTHON}} -m pytest -v -m "requires_network and not requires_private_key" {{.TEST_DIR}}'
 
   test:live:
     desc: Run live write tests (private key required)
     deps: [install]
     cmds:
       - echo "🔥 Running live write tests..."
-      - '{{.PYTHON}} -m pytest -v -m "requires_private_key" {{.TEST_DIR}}'
+      - '{{.VENV_PYTHON}} -m pytest -v -m "requires_private_key" {{.TEST_DIR}}'
 
   test:all:
     desc: Run all tests
     deps: [install]
     cmds:
       - echo "🚀 Running all tests..."
-      - '{{.PYTHON}} -m pytest -v {{.TEST_DIR}}'
+      - '{{.VENV_PYTHON}} -m pytest -v {{.TEST_DIR}}'
 
   # Alternative pytest commands for more control
   pytest:
     desc: Run pytest with custom args
     deps: [install]
     cmds:
-      - '{{.PYTHON}} -m pytest {{.CLI_ARGS}}'
+      - '{{.VENV_PYTHON}} -m pytest {{.CLI_ARGS}}'
 
   pytest:verbose:
     desc: Run pytest with verbose output
     deps: [install]
     cmds:
-      - '{{.PYTHON}} -m pytest -v {{.CLI_ARGS}}'
+      - '{{.VENV_PYTHON}} -m pytest -v {{.CLI_ARGS}}'
 
   # Code quality and linting
   check:format:
@@ -99,22 +100,22 @@ tasks:
     deps: [install]
     cmds:
       - echo "🎨 Checking code formatting..."
-      - '{{.PYTHON}} -m black --check --diff {{.SOURCE_DIR}}'
-      - '{{.PYTHON}} -m isort --check-only --diff {{.SOURCE_DIR}}'
+      - '{{.VENV_PYTHON}} -m black --check --diff {{.SOURCE_DIR}}'
+      - '{{.VENV_PYTHON}} -m isort --check-only --diff {{.SOURCE_DIR}}'
 
   check:lint:
     desc: Run linting with flake8
     deps: [install]
     cmds:
       - echo "🔍 Running linter..."
-      - '{{.PYTHON}} -m flake8 {{.SOURCE_DIR}}'
+      - '{{.VENV_PYTHON}} -m flake8 {{.SOURCE_DIR}}'
 
   check:types:
     desc: Run type checking with mypy
     deps: [install]
     cmds:
       - echo "📝 Running type checker..."
-      - '{{.PYTHON}} -m mypy {{.SOURCE_DIR}}/main'
+      - '{{.VENV_PYTHON}} -m mypy {{.SOURCE_DIR}}/main'
 
   check:
     desc: Run all code quality checks
@@ -131,8 +132,8 @@ tasks:
     deps: [install]
     cmds:
       - echo "🎨 Formatting code..."
-      - '{{.PYTHON}} -m black {{.SOURCE_DIR}}'
-      - '{{.PYTHON}} -m isort {{.SOURCE_DIR}}'
+      - '{{.VENV_PYTHON}} -m black {{.SOURCE_DIR}}'
+      - '{{.VENV_PYTHON}} -m isort {{.SOURCE_DIR}}'
       - echo "✅ Code formatted"
 
   # Packaging tasks
@@ -141,7 +142,7 @@ tasks:
     deps: [install, clean]
     cmds:
       - echo "📦 Building distribution packages..."
-      - '{{.PYTHON}} -m build'
+      - '{{.VENV_PYTHON}} -m build'
       - echo "✅ Build completed"
       - ls -la dist/
 
@@ -150,7 +151,7 @@ tasks:
     deps: [build]
     cmds:
       - echo "🔍 Verifying built packages..."
-      - '{{.PYTHON}} -m twine check dist/*'
+      - '{{.VENV_PYTHON}} -m twine check dist/*'
       - echo "✅ Package verification completed"
 
   # Development workflow
@@ -174,24 +175,24 @@ tasks:
     desc: Show installed dependencies
     deps: [install]
     cmds:
-      - '{{.PYTHON}} -m pip list'
+      - '{{.VENV_PYTHON}} -m pip list'
 
   deps:outdated:
     desc: Show outdated dependencies
     deps: [install]
     cmds:
-      - '{{.PYTHON}} -m pip list --outdated'
+      - '{{.VENV_PYTHON}} -m pip list --outdated'
 
   env:
     desc: Show environment information
     deps: [_ensure-venv]
     cmds:
       - echo "🔍 Environment Information"
-      - echo "Python - $({{.PYTHON}} --version)"
+      - echo "Python - $({{.VENV_PYTHON}} --version)"
       - echo "Virtual Environment - {{.VENV_DIR}}"
       - echo "Source Directory - {{.SOURCE_DIR}}"
       - echo "Test Directory - {{.TEST_DIR}}"
-      - echo "Pip - $({{.PYTHON}} -m pip --version)"
+      - echo "Pip - $({{.VENV_PYTHON}} -m pip --version)"
 
   # Security and supply chain
   audit:
@@ -199,7 +200,7 @@ tasks:
     deps: [install]
     cmds:
       - echo "🔒 Running security audit..."
-      - '{{.PYTHON}} -m pip_audit || echo "⚠️  pip-audit not installed, run pip install pip-audit"'
+      - '{{.VENV_PYTHON}} -m pip_audit || echo "⚠️  pip-audit not installed, run pip install pip-audit"'
 
   # Documentation tasks (if needed)
   docs:build:
@@ -218,7 +219,7 @@ tasks:
       - task: test:all
       - task: build
       - echo "🔍 Verifying built packages..."
-      - '{{.PYTHON}} -m twine check dist/*'
+      - '{{.VENV_PYTHON}} -m twine check dist/*'
       - echo "✅ Package verification completed"
       - echo "🚀 Ready for release!"
 
