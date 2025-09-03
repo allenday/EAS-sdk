@@ -1,0 +1,356 @@
+#!/usr/bin/env python3
+"""
+EAS Development Helper Script
+
+This script provides convenient shortcuts for common EAS development tasks.
+It's designed to make the developer experience smoother.
+
+Usage:
+    ./scripts/eas-dev <command> [options]
+
+Commands:
+    setup              Set up development environment
+    test               Run tests (with smart test selection)
+    format             Format code 
+    check              Run all code quality checks
+    chains             List supported chains
+    example            Run example scripts
+    clean              Clean build artifacts
+    build              Build the package
+    shell              Start an interactive shell with EAS imported
+    docs               Generate or serve documentation
+    
+Examples:
+    ./scripts/eas-dev setup
+    ./scripts/eas-dev test unit
+    ./scripts/eas-dev example quick-start
+    ./scripts/eas-dev chains --testnet
+    ./scripts/eas-dev shell
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def get_venv_python():
+    """Get path to virtual environment Python."""
+    venv_path = Path(".venv")
+    if os.name == "nt":
+        python_path = venv_path / "Scripts" / "python.exe"
+    else:
+        python_path = venv_path / "bin" / "python"
+    
+    if python_path.exists():
+        return str(python_path)
+    
+    print("⚠️  Virtual environment not found. Run: ./scripts/eas-dev setup")
+    return sys.executable
+
+
+def run_command(cmd, description="Running command", check=True):
+    """Run a command with nice output."""
+    print(f"🔧 {description}...")
+    print(f"   Command: {' '.join(cmd)}")
+    
+    try:
+        result = subprocess.run(cmd, check=check)
+        if result.returncode == 0:
+            print(f"   ✅ {description} completed")
+        return result.returncode == 0
+    except subprocess.CalledProcessError as e:
+        print(f"   ❌ {description} failed with code {e.returncode}")
+        return False
+    except FileNotFoundError:
+        print(f"   ❌ Command not found: {cmd[0]}")
+        return False
+
+
+def command_setup(args):
+    """Set up development environment."""
+    if Path("setup_dev.py").exists():
+        python = get_venv_python()
+        cmd = [python, "setup_dev.py"]
+        if args.testnet:
+            cmd.append("--testnet")
+        if args.mainnet:
+            cmd.append("--mainnet")
+        if args.interactive:
+            cmd.append("--interactive")
+        
+        return run_command(cmd, "Setting up development environment")
+    else:
+        print("❌ setup_dev.py not found")
+        return False
+
+
+def command_test(args):
+    """Run tests with smart selection."""
+    python = get_venv_python()
+    
+    # Check if Task is available
+    if Path("Taskfile.yml").exists():
+        try:
+            if args.test_type == "unit":
+                cmd = ["task", "test:unit"]
+            elif args.test_type == "integration": 
+                cmd = ["task", "test:integration"]
+            elif args.test_type == "all":
+                cmd = ["task", "test:all"]
+            else:
+                cmd = ["task", "test:unit"]  # Default
+                
+            return run_command(cmd, f"Running {args.test_type} tests")
+        except:
+            pass
+    
+    # Fallback to direct pytest
+    cmd = [python, "-m", "pytest", "-v"]
+    if args.test_type == "unit":
+        cmd.extend(["-m", "not requires_network and not requires_private_key"])
+    elif args.test_type == "integration":
+        cmd.extend(["-m", "integration and not requires_private_key"])
+    
+    cmd.append("src/test")
+    return run_command(cmd, f"Running {args.test_type} tests")
+
+
+def command_format(args):
+    """Format code."""
+    python = get_venv_python()
+    
+    if Path("Taskfile.yml").exists():
+        return run_command(["task", "format"], "Formatting code")
+    
+    # Fallback to direct commands
+    success = True
+    success &= run_command([python, "-m", "black", "src"], "Running black")
+    success &= run_command([python, "-m", "isort", "src"], "Running isort")
+    return success
+
+
+def command_check(args):
+    """Run all code quality checks."""
+    if Path("Taskfile.yml").exists():
+        return run_command(["task", "check"], "Running all checks")
+    
+    python = get_venv_python()
+    success = True
+    success &= run_command([python, "-m", "black", "--check", "src"], "Checking formatting")
+    success &= run_command([python, "-m", "flake8", "src"], "Running linter")
+    success &= run_command([python, "-m", "mypy", "src/main"], "Running type checker")
+    return success
+
+
+def command_chains(args):
+    """List supported chains."""
+    python = get_venv_python()
+    
+    if args.testnet:
+        filter_cmd = "testnet_chains = get_testnet_chains(); print('\\n'.join(testnet_chains))"
+    elif args.mainnet:
+        filter_cmd = "mainnet_chains = get_mainnet_chains(); print('\\n'.join(mainnet_chains))"
+    else:
+        filter_cmd = "all_chains = list_supported_chains(); print('\\n'.join(all_chains))"
+    
+    cmd = [
+        python, "-c",
+        f"from EAS import list_supported_chains, get_mainnet_chains, get_testnet_chains; {filter_cmd}"
+    ]
+    
+    return run_command(cmd, "Listing supported chains", check=False)
+
+
+def command_example(args):
+    """Run example scripts."""
+    python = get_venv_python()
+    
+    examples = {
+        "quick-start": "examples/quick_start.py",
+        "full": "examples/full_example.py", 
+        "multi-chain": "examples/multi_chain_examples.py"
+    }
+    
+    if args.name not in examples:
+        print(f"❌ Unknown example: {args.name}")
+        print(f"   Available examples: {', '.join(examples.keys())}")
+        return False
+    
+    example_path = examples[args.name]
+    if not Path(example_path).exists():
+        print(f"❌ Example file not found: {example_path}")
+        return False
+    
+    cmd = [python, example_path]
+    return run_command(cmd, f"Running {args.name} example")
+
+
+def command_clean(args):
+    """Clean build artifacts."""
+    if Path("Taskfile.yml").exists():
+        return run_command(["task", "clean"], "Cleaning artifacts")
+    
+    # Manual cleanup
+    import shutil
+    
+    patterns = [
+        "build",
+        "dist", 
+        "*.egg-info",
+        ".pytest_cache",
+        "__pycache__",
+        ".coverage",
+        "htmlcov"
+    ]
+    
+    for pattern in patterns:
+        for path in Path(".").glob(pattern):
+            if path.is_dir():
+                shutil.rmtree(path)
+                print(f"   🗑️  Removed directory: {path}")
+            else:
+                path.unlink()
+                print(f"   🗑️  Removed file: {path}")
+    
+    print("   ✅ Clean completed")
+    return True
+
+
+def command_build(args):
+    """Build the package."""
+    if Path("Taskfile.yml").exists():
+        return run_command(["task", "build"], "Building package")
+    
+    python = get_venv_python()
+    return run_command([python, "-m", "build"], "Building package")
+
+
+def command_shell(args):
+    """Start interactive shell with EAS imported."""
+    python = get_venv_python()
+    
+    startup_code = '''
+import sys
+print("🚀 EAS SDK Interactive Shell")
+print("="*30)
+
+try:
+    from EAS import EAS, list_supported_chains, get_network_config
+    print("✅ EAS SDK imported successfully")
+    print()
+    print("Available objects:")
+    print("  • EAS - Main EAS class")
+    print("  • list_supported_chains() - List all chains")
+    print("  • get_network_config(chain) - Get chain config")
+    print()
+    print("Quick start:")
+    print("  chains = list_supported_chains()")
+    print("  eas = EAS.from_environment()  # Requires .env setup")
+    print()
+except ImportError as e:
+    print(f"❌ Failed to import EAS SDK: {e}")
+    print("   Make sure you've run: ./scripts/eas-dev setup")
+    
+'''
+    
+    # Write startup script to temp file
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(startup_code)
+        startup_file = f.name
+    
+    try:
+        cmd = [python, "-i", startup_file]
+        subprocess.run(cmd)
+        return True
+    finally:
+        os.unlink(startup_file)
+
+
+def command_docs(args):
+    """Generate or serve documentation."""
+    print("📚 Documentation commands:")
+    print("   • View README: cat README.md")
+    print("   • View examples: ls examples/")
+    print("   • Online docs: https://docs.attest.sh")
+    return True
+
+
+def main():
+    """Main CLI function."""
+    parser = argparse.ArgumentParser(description="EAS Development Helper")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Setup command
+    setup_parser = subparsers.add_parser("setup", help="Set up development environment")
+    setup_parser.add_argument("--testnet", action="store_true", help="Configure for testnet")
+    setup_parser.add_argument("--mainnet", action="store_true", help="Configure for mainnet")
+    setup_parser.add_argument("--interactive", action="store_true", help="Interactive mode")
+    
+    # Test command
+    test_parser = subparsers.add_parser("test", help="Run tests")
+    test_parser.add_argument("test_type", nargs="?", default="unit", 
+                           choices=["unit", "integration", "all"], 
+                           help="Test type to run (default: unit)")
+    
+    # Format command
+    format_parser = subparsers.add_parser("format", help="Format code")
+    
+    # Check command
+    check_parser = subparsers.add_parser("check", help="Run code quality checks")
+    
+    # Chains command
+    chains_parser = subparsers.add_parser("chains", help="List supported chains")
+    chains_parser.add_argument("--mainnet", action="store_true", help="Show only mainnet chains")
+    chains_parser.add_argument("--testnet", action="store_true", help="Show only testnet chains")
+    
+    # Example command
+    example_parser = subparsers.add_parser("example", help="Run example scripts")
+    example_parser.add_argument("name", choices=["quick-start", "full", "multi-chain"],
+                               help="Example to run")
+    
+    # Clean command
+    clean_parser = subparsers.add_parser("clean", help="Clean build artifacts")
+    
+    # Build command
+    build_parser = subparsers.add_parser("build", help="Build package")
+    
+    # Shell command
+    shell_parser = subparsers.add_parser("shell", help="Interactive shell")
+    
+    # Docs command
+    docs_parser = subparsers.add_parser("docs", help="Documentation")
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return
+    
+    # Map commands to functions
+    commands = {
+        "setup": command_setup,
+        "test": command_test,
+        "format": command_format,
+        "check": command_check,
+        "chains": command_chains,
+        "example": command_example,
+        "clean": command_clean,
+        "build": command_build,
+        "shell": command_shell,
+        "docs": command_docs,
+    }
+    
+    command_func = commands.get(args.command)
+    if command_func:
+        success = command_func(args)
+        sys.exit(0 if success else 1)
+    else:
+        print(f"❌ Unknown command: {args.command}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,7 +1,50 @@
-# Import the main EAS class
-# Import configuration helpers
-from . import config
+# Import the main EAS class and commonly used utilities
 from .core import EAS
 
-# Make EAS available at package level
-__all__ = ["EAS", "config"]
+# Import configuration helpers and common functions
+from . import config
+from .config import (
+    get_network_config,
+    list_supported_chains,
+    get_mainnet_chains,
+    get_testnet_chains,
+)
+
+# Import exceptions for better error handling
+from .exceptions import (
+    EASError,
+    EASValidationError,
+    EASTransactionError,
+    SecurityError,
+)
+
+# Import transaction result type
+from .transaction import TransactionResult
+
+# Version info
+__version__ = "0.1.0"
+
+# Make commonly used items available at package level
+__all__ = [
+    # Main class
+    "EAS",
+    
+    # Configuration
+    "config",
+    "get_network_config",
+    "list_supported_chains", 
+    "get_mainnet_chains",
+    "get_testnet_chains",
+    
+    # Exceptions
+    "EASError",
+    "EASValidationError", 
+    "EASTransactionError",
+    "SecurityError",
+    
+    # Types
+    "TransactionResult",
+    
+    # Version
+    "__version__",
+]
