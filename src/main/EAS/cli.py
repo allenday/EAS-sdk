@@ -1051,7 +1051,6 @@ try:
 except ImportError as e:
     print(f"❌ Failed to import EAS SDK: {e}")
     print("   Make sure you've run: eas-tools dev setup")
-    
 """
 
     # Write startup script to temp file
