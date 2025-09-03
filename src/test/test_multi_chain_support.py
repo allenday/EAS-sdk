@@ -213,7 +213,11 @@ class TestMultiChainSupport:
 
         for network in legacy_networks:
             try:
-                eas = create_eas_instance(network)
+                eas = create_eas_instance(
+                    network,
+                    from_account="0x1234567890123456789012345678901234567890",
+                    private_key="deadbeef" * 8
+                )
 
                 assert eas.chain_id is not None
                 assert eas.contract_address is not None
