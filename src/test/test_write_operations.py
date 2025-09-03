@@ -29,7 +29,7 @@ class TestSchemaRegistry:
             web3=mock_w3,
             registry_address="0x1234567890123456789012345678901234567890",
             from_account="0xabcd",
-            private_key="deadbeef" * 8,
+            private_key="0x" + "deadbeef" * 8,
         )
 
         assert registry.w3 == mock_w3
@@ -45,7 +45,7 @@ class TestSchemaRegistry:
             mock_w3,
             "0x1234567890123456789012345678901234567890",
             "0xabcd",
-            "deadbeef" * 8,
+            "0x" + "deadbeef" * 8,
         )
 
         # Should not raise for valid schema
@@ -61,7 +61,7 @@ class TestSchemaRegistry:
             mock_w3,
             "0x1234567890123456789012345678901234567890",
             "0xabcd",
-            "deadbeef" * 8,
+            "0x" + "deadbeef" * 8,
         )
 
         # Should raise for invalid schemas
