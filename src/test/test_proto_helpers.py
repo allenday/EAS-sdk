@@ -3,13 +3,13 @@ Tests for proto_helpers module.
 """
 
 import json
-import pytest
+
 from main.EAS.proto_helpers import (
-    json_to_schema,
-    json_to_attestation,
-    schema_to_dict,
     attestation_to_dict,
+    json_to_attestation,
+    json_to_schema,
     parse_graphql_response,
+    schema_to_dict,
 )
 
 
@@ -28,9 +28,9 @@ class TestProtoHelpers:
             "txid": "0x9876543210fedcba",
             "time": 1234567890,
         }
-        
+
         schema = json_to_schema(json_data)
-        
+
         assert schema.id == "0x1234567890abcdef"
         assert schema.schema == "string domain,string path"
         assert schema.creator == "0xabcdef1234567890"
@@ -59,9 +59,9 @@ class TestProtoHelpers:
             "ipfsHash": "",
             "isOffchain": False,
         }
-        
+
         attestation = json_to_attestation(json_data)
-        
+
         assert attestation.id == "0x1234567890abcdef"
         assert attestation.schema_id == "0xabcdef1234567890"
         assert attestation.attester == "0x1111111111111111"
@@ -70,18 +70,24 @@ class TestProtoHelpers:
         assert attestation.expiration_time == 0
         assert attestation.revocable is True
         assert attestation.revoked is False
-        assert attestation.data == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        assert (
+            attestation.data
+            == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
         assert attestation.txid == "0x9876543210fedcba"
         assert attestation.time_created == 1234567891
         assert attestation.revocation_time == 0
-        assert attestation.ref_uid == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        assert (
+            attestation.ref_uid
+            == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
         assert attestation.ipfs_hash == ""
         assert attestation.is_offchain is False
 
     def test_schema_to_dict(self):
         """Test converting protobuf Schema to dictionary."""
         from main.EAS.generated.eas.v1.messages_pb2 import Schema
-        
+
         schema = Schema(
             id="0x1234567890abcdef",
             schema="string domain,string path",
@@ -92,9 +98,9 @@ class TestProtoHelpers:
             txid="0x9876543210fedcba",
             time=1234567890,
         )
-        
+
         result = schema_to_dict(schema)
-        
+
         assert result["id"] == "0x1234567890abcdef"
         assert result["schema"] == "string domain,string path"
         assert result["creator"] == "0xabcdef1234567890"
@@ -107,7 +113,7 @@ class TestProtoHelpers:
     def test_attestation_to_dict(self):
         """Test converting protobuf Attestation to dictionary."""
         from main.EAS.generated.eas.v1.messages_pb2 import Attestation
-        
+
         attestation = Attestation(
             id="0x1234567890abcdef",
             schema_id="0xabcdef1234567890",
@@ -125,9 +131,9 @@ class TestProtoHelpers:
             ipfs_hash="",
             is_offchain=False,
         )
-        
+
         result = attestation_to_dict(attestation)
-        
+
         assert result["id"] == "0x1234567890abcdef"
         assert result["schemaId"] == "0xabcdef1234567890"
         assert result["attester"] == "0x1111111111111111"
@@ -136,11 +142,17 @@ class TestProtoHelpers:
         assert result["expirationTime"] == 0
         assert result["revocable"] is True
         assert result["revoked"] is False
-        assert result["data"] == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        assert (
+            result["data"]
+            == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
         assert result["txid"] == "0x9876543210fedcba"
         assert result["timeCreated"] == 1234567891
         assert result["revocationTime"] == 0
-        assert result["refUID"] == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        assert (
+            result["refUID"]
+            == "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
         assert result["ipfsHash"] == ""
         assert result["isOffchain"] is False
 
@@ -160,9 +172,9 @@ class TestProtoHelpers:
                 }
             }
         }
-        
+
         result = parse_graphql_response(json.dumps(response), "schema")
-        
+
         assert result is not None
         assert result["id"] == "0x1234567890abcdef"
         assert result["schema"] == "string domain,string path"
@@ -191,9 +203,9 @@ class TestProtoHelpers:
                 }
             }
         }
-        
+
         result = parse_graphql_response(json.dumps(response), "attestation")
-        
+
         assert result is not None
         assert result["id"] == "0x1234567890abcdef"
         assert result["schemaId"] == "0xabcdef1234567890"
@@ -201,16 +213,12 @@ class TestProtoHelpers:
 
     def test_parse_graphql_response_with_errors(self):
         """Test parsing GraphQL response with errors."""
-        response = {
-            "errors": [
-                {"message": "Schema not found"}
-            ]
-        }
-        
+        response = {"errors": [{"message": "Schema not found"}]}
+
         result = parse_graphql_response(json.dumps(response), "schema")
         assert result is None
 
     def test_parse_graphql_response_invalid_json(self):
         """Test parsing invalid JSON response."""
         result = parse_graphql_response("invalid json", "schema")
-        assert result is None 
+        assert result is None

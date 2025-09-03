@@ -3,18 +3,23 @@ Helper functions for converting between GraphQL JSON responses and protobuf mess
 """
 
 import json
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from .generated.eas.v1.messages_pb2 import Schema, Attestation, SchemaResponse, AttestationResponse
+from .generated.eas.v1.messages_pb2 import (  # type: ignore[attr-defined]
+    Attestation,
+    AttestationResponse,
+    Schema,
+    SchemaResponse,
+)
 
 
 def json_to_schema(json_data: Dict[str, Any]) -> Schema:
     """
     Convert a GraphQL JSON schema response to a protobuf Schema message.
-    
+
     Args:
         json_data: Dictionary containing schema data from GraphQL API
-        
+
     Returns:
         Schema protobuf message
     """
@@ -33,10 +38,10 @@ def json_to_schema(json_data: Dict[str, Any]) -> Schema:
 def json_to_attestation(json_data: Dict[str, Any]) -> Attestation:
     """
     Convert a GraphQL JSON attestation response to a protobuf Attestation message.
-    
+
     Args:
         json_data: Dictionary containing attestation data from GraphQL API
-        
+
     Returns:
         Attestation protobuf message
     """
@@ -62,10 +67,10 @@ def json_to_attestation(json_data: Dict[str, Any]) -> Attestation:
 def schema_to_dict(schema: Schema) -> Dict[str, Any]:
     """
     Convert a protobuf Schema message to a dictionary.
-    
+
     Args:
         schema: Schema protobuf message
-        
+
     Returns:
         Dictionary representation of the schema
     """
@@ -84,10 +89,10 @@ def schema_to_dict(schema: Schema) -> Dict[str, Any]:
 def attestation_to_dict(attestation: Attestation) -> Dict[str, Any]:
     """
     Convert a protobuf Attestation message to a dictionary.
-    
+
     Args:
         attestation: Attestation protobuf message
-        
+
     Returns:
         Dictionary representation of the attestation
     """
@@ -110,25 +115,27 @@ def attestation_to_dict(attestation: Attestation) -> Dict[str, Any]:
     }
 
 
-def parse_graphql_response(response_text: str, response_type: str) -> Optional[Dict[str, Any]]:
+def parse_graphql_response(
+    response_text: str, response_type: str
+) -> Optional[Dict[str, Any]]:
     """
     Parse a GraphQL response and convert to protobuf message.
-    
+
     Args:
         response_text: JSON string response from GraphQL API
         response_type: Either 'schema' or 'attestation'
-        
+
     Returns:
         Dictionary representation of the parsed data, or None if parsing failed
     """
     try:
         response_data = json.loads(response_text)
-        
+
         if "errors" in response_data:
             return None
-            
+
         data = response_data.get("data", {})
-        
+
         if response_type == "schema":
             schema_data = data.get("schema")
             if schema_data:
@@ -137,7 +144,7 @@ def parse_graphql_response(response_text: str, response_type: str) -> Optional[D
             attestation_data = data.get("attestation")
             if attestation_data:
                 return attestation_to_dict(json_to_attestation(attestation_data))
-                
+
         return None
     except (json.JSONDecodeError, KeyError, TypeError):
-        return None 
+        return None

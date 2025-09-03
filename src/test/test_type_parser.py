@@ -3,13 +3,14 @@ Tests for type_parser module.
 """
 
 import pytest
+
 from main.EAS.type_parser import (
-    EASTypeParser,
-    EASType,
     EASField,
-    parse_eas_type,
+    EASType,
+    EASTypeParser,
     parse_eas_field,
     parse_eas_schema_definition,
+    parse_eas_type,
 )
 
 
@@ -102,27 +103,35 @@ class TestEASTypeParser:
         """Test parsing complex array types."""
         # Fixed-size arrays
         assert EASTypeParser.parse_type("int40[2]") == EASType("int40", [2], False)
-        assert EASTypeParser.parse_type("uint256[10]") == EASType("uint256", [10], False)
+        assert EASTypeParser.parse_type("uint256[10]") == EASType(
+            "uint256", [10], False
+        )
 
         # Array of fixed-size arrays
         assert EASTypeParser.parse_type("int40[2][]") == EASType("int40", [2], True)
-        assert EASTypeParser.parse_type("uint256[10][]") == EASType("uint256", [10], True)
+        assert EASTypeParser.parse_type("uint256[10][]") == EASType(
+            "uint256", [10], True
+        )
 
         # Multi-dimensional fixed arrays
-        assert EASTypeParser.parse_type("int40[2][3]") == EASType("int40", [2, 3], False)
-        assert EASTypeParser.parse_type("int40[2][3][]") == EASType("int40", [2, 3], True)
+        assert EASTypeParser.parse_type("int40[2][3]") == EASType(
+            "int40", [2, 3], False
+        )
+        assert EASTypeParser.parse_type("int40[2][3][]") == EASType(
+            "int40", [2, 3], True
+        )
 
     def test_parse_type_invalid(self):
         """Test parsing invalid types."""
         with pytest.raises(ValueError, match="Invalid EAS type"):
             EASTypeParser.parse_type("")
-        
+
         with pytest.raises(ValueError, match="Invalid EAS type"):
             EASTypeParser.parse_type("123string")
-        
+
         with pytest.raises(ValueError, match="Invalid EAS type"):
             EASTypeParser.parse_type("string[")
-        
+
         with pytest.raises(ValueError, match="Invalid EAS type"):
             EASTypeParser.parse_type("string[abc]")
 
@@ -160,16 +169,18 @@ class TestEASTypeParser:
         """Test parsing invalid fields."""
         with pytest.raises(ValueError, match="Invalid EAS field"):
             EASTypeParser.parse_field("")
-        
+
         with pytest.raises(ValueError, match="Invalid EAS field"):
             EASTypeParser.parse_field("string")
-        
+
         with pytest.raises(ValueError, match="Invalid EAS field"):
             EASTypeParser.parse_field("123string domain")
 
     def test_parse_schema_definition_simple(self):
         """Test parsing simple schema definitions."""
-        fields = EASTypeParser.parse_schema_definition("string domain,address registrant")
+        fields = EASTypeParser.parse_schema_definition(
+            "string domain,address registrant"
+        )
         assert len(fields) == 2
         assert fields[0].name == "domain"
         assert fields[0].type == EASType("string", [], False)
@@ -178,7 +189,9 @@ class TestEASTypeParser:
 
     def test_parse_schema_definition_with_arrays(self):
         """Test parsing schema definitions with arrays."""
-        fields = EASTypeParser.parse_schema_definition("string domain,address[] registrants,uint256[] amounts")
+        fields = EASTypeParser.parse_schema_definition(
+            "string domain,address[] registrants,uint256[] amounts"
+        )
         assert len(fields) == 3
         assert fields[0].name == "domain"
         assert fields[0].type == EASType("string", [], False)
@@ -189,7 +202,9 @@ class TestEASTypeParser:
 
     def test_parse_schema_definition_complex(self):
         """Test parsing complex schema definitions."""
-        schema_def = "uint8 holdType,uint8 useType,uint64 expiration,int40[2][] polygonArea"
+        schema_def = (
+            "uint8 holdType,uint8 useType,uint64 expiration,int40[2][] polygonArea"
+        )
         fields = EASTypeParser.parse_schema_definition(schema_def)
         assert len(fields) == 4
         assert fields[0].name == "holdType"
@@ -203,7 +218,9 @@ class TestEASTypeParser:
 
     def test_parse_schema_definition_with_spaces(self):
         """Test parsing schema definitions with extra spaces."""
-        fields = EASTypeParser.parse_schema_definition("  string  domain  ,  address  registrant  ")
+        fields = EASTypeParser.parse_schema_definition(
+            "  string  domain  ,  address  registrant  "
+        )
         assert len(fields) == 2
         assert fields[0].name == "domain"
         assert fields[0].type == EASType("string", [], False)
@@ -212,7 +229,9 @@ class TestEASTypeParser:
 
     def test_parse_schema_definition_empty_fields(self):
         """Test parsing schema definitions with empty fields."""
-        fields = EASTypeParser.parse_schema_definition("string domain,,address registrant")
+        fields = EASTypeParser.parse_schema_definition(
+            "string domain,,address registrant"
+        )
         assert len(fields) == 2
         assert fields[0].name == "domain"
         assert fields[1].name == "registrant"
@@ -260,4 +279,4 @@ class TestConvenienceFunctions:
         fields = parse_eas_schema_definition("string domain,address registrant")
         assert len(fields) == 2
         assert fields[0].name == "domain"
-        assert fields[1].name == "registrant" 
+        assert fields[1].name == "registrant"

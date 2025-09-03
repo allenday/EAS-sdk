@@ -1,1 +1,1 @@
-# Proto package for EAS SDK 
+# Proto package for EAS SDK
