@@ -1,11 +1,10 @@
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import json
 import os
-
-# Import the EAS class
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from unittest.mock import Mock, patch
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from main.EAS.core import EAS
 
 
@@ -18,10 +17,10 @@ class TestEAS:
         mock_w3 = Mock()
         mock_w3.is_connected.return_value = True
         mock_w3.eth.get_transaction_count.return_value = 0
-        mock_w3.eth.send_raw_transaction.return_value = b'tx_hash'
-        mock_w3.eth.wait_for_transaction_receipt.return_value = {'status': 1}
+        mock_w3.eth.send_raw_transaction.return_value = b"tx_hash"
+        mock_w3.eth.wait_for_transaction_receipt.return_value = {"status": 1}
         mock_w3.to_hex.side_effect = lambda x: f"0x{x.hex()}"
-        mock_w3.keccak.return_value = b'keccak_hash'
+        mock_w3.keccak.return_value = b"keccak_hash"
         return mock_w3
 
     @pytest.fixture
@@ -31,16 +30,18 @@ class TestEAS:
         mock_contract.address = "0x1234567890123456789012345678901234567890"
         mock_contract.functions.attest.return_value.estimate_gas.return_value = 100000
         mock_contract.functions.attest.return_value.build_transaction.return_value = {
-            'from': '0x1234567890123456789012345678901234567890',
-            'gas': 100000,
-            'nonce': 0
+            "from": "0x1234567890123456789012345678901234567890",
+            "gas": 100000,
+            "nonce": 0,
         }
         return mock_contract
 
-    @patch('main.EAS.core.web3.Web3')
-    @patch('builtins.open')
-    @patch('json.load')
-    def test_init_success(self, mock_json_load, mock_open, mock_web3_class, mock_web3, mock_contract):
+    @patch("main.EAS.core.web3.Web3")
+    @patch("builtins.open")
+    @patch("json.load")
+    def test_init_success(
+        self, mock_json_load, mock_open, mock_web3_class, mock_web3, mock_contract
+    ):
         """Test successful initialization of EAS class"""
         # Setup mocks
         mock_web3_class.HTTPProvider.return_value = Mock()
@@ -55,14 +56,14 @@ class TestEAS:
             chain_id=1,
             contract_version="0.26",
             from_account="0x1234567890123456789012345678901234567890",
-            private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
+            private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
         )
 
         assert eas.from_account == "0x1234567890123456789012345678901234567890"
         assert eas.chain_id == 1
         assert eas.contract_version == "0.26"
 
-    @patch('main.EAS.core.web3.Web3')
+    @patch("main.EAS.core.web3.Web3")
     def test_init_connection_failure(self, mock_web3_class):
         """Test initialization failure when web3 connection fails"""
         # Setup mock to return False for is_connected
@@ -78,15 +79,17 @@ class TestEAS:
                 chain_id=1,
                 contract_version="0.26",
                 from_account="0x1234567890123456789012345678901234567890",
-                private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
+                private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
             )
 
     def test_get_offchain_uid_version_0(self, mock_web3, mock_contract):
         """Test get_offchain_uid with version 0"""
-        with patch('main.EAS.core.web3.Web3') as mock_web3_class, \
-             patch('builtins.open'), \
-             patch('json.load') as mock_json_load:
-            
+        with (
+            patch("main.EAS.core.web3.Web3") as mock_web3_class,
+            patch("builtins.open"),
+            patch("json.load") as mock_json_load,
+        ):
+
             mock_web3_class.return_value = mock_web3
             mock_web3.eth.contract.return_value = mock_contract
             mock_json_load.return_value = [{"type": "function"}]
@@ -97,7 +100,7 @@ class TestEAS:
                 chain_id=1,
                 contract_version="0.26",
                 from_account="0x1234567890123456789012345678901234567890",
-                private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
+                private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
             )
 
             uid = eas.get_offchain_uid(
@@ -108,17 +111,19 @@ class TestEAS:
                 expiration_time=1234567899,
                 revocable=True,
                 ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
-                data=b"test_data"
+                data=b"test_data",
             )
 
             assert uid == "6b656363616b5f68617368"  # hex of b'keccak_hash'
 
     def test_get_offchain_uid_version_1(self, mock_web3, mock_contract):
         """Test get_offchain_uid with version 1"""
-        with patch('main.EAS.core.web3.Web3') as mock_web3_class, \
-             patch('builtins.open'), \
-             patch('json.load') as mock_json_load:
-            
+        with (
+            patch("main.EAS.core.web3.Web3") as mock_web3_class,
+            patch("builtins.open"),
+            patch("json.load") as mock_json_load,
+        ):
+
             mock_web3_class.return_value = mock_web3
             mock_web3.eth.contract.return_value = mock_contract
             mock_json_load.return_value = [{"type": "function"}]
@@ -129,7 +134,7 @@ class TestEAS:
                 chain_id=1,
                 contract_version="0.26",
                 from_account="0x1234567890123456789012345678901234567890",
-                private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
+                private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
             )
 
             # Version 1 should now work with EIP-712 implementation
@@ -141,13 +146,13 @@ class TestEAS:
                 expiration_time=1234567899,
                 revocable=True,
                 ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
-                data=b"test_data"
+                data=b"test_data",
             )
-            
+
             # Should return a valid hex string UID
             assert uid_v1.startswith("0x")
             assert len(uid_v1) == 66  # 0x + 64 hex characters = 32 bytes
-            
+
             # Should be deterministic - same inputs should produce same UID
             uid_v1_repeat = eas.get_offchain_uid(
                 version=1,
@@ -157,16 +162,18 @@ class TestEAS:
                 expiration_time=1234567899,
                 revocable=True,
                 ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
-                data=b"test_data"
+                data=b"test_data",
             )
             assert uid_v1 == uid_v1_repeat
 
     def test_get_offchain_uid_unsupported_version(self, mock_web3, mock_contract):
         """Test get_offchain_uid with unsupported version"""
-        with patch('main.EAS.core.web3.Web3') as mock_web3_class, \
-             patch('builtins.open'), \
-             patch('json.load') as mock_json_load:
-            
+        with (
+            patch("main.EAS.core.web3.Web3") as mock_web3_class,
+            patch("builtins.open"),
+            patch("json.load") as mock_json_load,
+        ):
+
             mock_web3_class.return_value = mock_web3
             mock_web3.eth.contract.return_value = mock_contract
             mock_json_load.return_value = [{"type": "function"}]
@@ -177,7 +184,7 @@ class TestEAS:
                 chain_id=1,
                 contract_version="0.26",
                 from_account="0x1234567890123456789012345678901234567890",
-                private_key="0x1234567890123456789012345678901234567890123456789012345678901234"
+                private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
             )
 
             with pytest.raises(ValueError, match="Unsupported version"):
@@ -189,5 +196,5 @@ class TestEAS:
                     expiration_time=1234567899,
                     revocable=True,
                     ref_uid="0x0000000000000000000000000000000000000000000000000000000000000000",
-                    data=b"test_data"
-                ) 
+                    data=b"test_data",
+                )

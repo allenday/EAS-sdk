@@ -1,9 +1,7 @@
 # Import the main EAS class
-from .core import EAS
-
 # Import configuration helpers
 from . import config
+from .core import EAS
 
 # Make EAS available at package level
-__all__ = ['EAS', 'config']
-
+__all__ = ["EAS", "config"]

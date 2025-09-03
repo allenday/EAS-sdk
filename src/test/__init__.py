@@ -1,1 +1,1 @@
-# Test package for EAS SDK 
+# Test package for EAS SDK

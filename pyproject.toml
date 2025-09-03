@@ -35,7 +35,9 @@ dependencies = [
     "rich",
     "click",
     "grpcio-tools",
+    "grpcio-status",
     "structlog",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +48,10 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "mypy-protobuf>=3.6.0",
+    "types-PyYAML",
+    "types-protobuf",
+    "types-requests",
     "build>=1.0.0",
     "twine>=4.0.0",
 ]
@@ -104,6 +110,12 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
+# Exclude generated and problematic files
+exclude = [
+    "src/main/EAS/generated/.*",
+    "src/main/EAS/schema_encoder.py",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["src/test", "tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -121,4 +133,10 @@ markers = [
     "integration: marks tests as integration tests",
     "live_write: marks tests that require real private key and perform blockchain writes",
     "network: marks tests that require network connectivity",
+    "requires_network: marks tests that require network connectivity",
+    "requires_private_key: marks tests that require private key and perform blockchain writes",
 ] 
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "C901"]

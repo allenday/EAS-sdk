@@ -4,7 +4,9 @@ Test utilities for EAS SDK tests.
 Provides utilities for conditional test skipping based on environment configuration
 and helper functions for test setup.
 """
+
 import os
+
 import pytest
 from dotenv import load_dotenv
 
@@ -14,21 +16,25 @@ load_dotenv()
 
 def has_private_key() -> bool:
     """Check if a private key is available in environment variables or .env file."""
-    private_key = os.getenv('PRIVATE_KEY', '').strip()
+    private_key = os.getenv("PRIVATE_KEY", "").strip()
     # Check if it's not empty and not the default example value
-    return bool(private_key and private_key != '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef')
+    return bool(
+        private_key
+        and private_key
+        != "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    )
 
 
 def has_network_config() -> bool:
     """Check if network configuration is available for testing."""
-    return bool(os.getenv('RPC_URL') or os.getenv('NETWORK'))
+    return bool(os.getenv("RPC_URL") or os.getenv("NETWORK"))
 
 
 def requires_private_key(func):
     """Decorator to skip tests that require a real private key for live write operations."""
     return pytest.mark.skipif(
         not has_private_key(),
-        reason="Requires PRIVATE_KEY in environment or .env file for live write operations"
+        reason="Requires PRIVATE_KEY in environment or .env file for live write operations",
     )(func)
 
 
@@ -36,7 +42,7 @@ def requires_network(func):
     """Decorator to skip tests that require network connectivity."""
     return pytest.mark.skipif(
         not has_network_config(),
-        reason="Requires network configuration (RPC_URL or NETWORK) for integration tests"
+        reason="Requires network configuration (RPC_URL or NETWORK) for integration tests",
     )(func)
 
 
