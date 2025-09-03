@@ -29,7 +29,7 @@ class TestSchemaRegistry:
             web3=mock_w3,
             registry_address="0x1234567890123456789012345678901234567890",
             from_account="0xabcd",
-            private_key="0x" + "deadbeef" * 8,
+            private_key="0xa7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
         )
 
         assert registry.w3 == mock_w3
@@ -45,7 +45,7 @@ class TestSchemaRegistry:
             mock_w3,
             "0x1234567890123456789012345678901234567890",
             "0xabcd",
-            "0x" + "deadbeef" * 8,
+            "0xa7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
         )
 
         # Should not raise for valid schema
@@ -61,7 +61,7 @@ class TestSchemaRegistry:
             mock_w3,
             "0x1234567890123456789012345678901234567890",
             "0xabcd",
-            "0x" + "deadbeef" * 8,
+            "0xa7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
         )
 
         # Should raise for invalid schemas
@@ -94,7 +94,14 @@ class TestEASWriteOperations:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
 
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS(
+            "http://test",
+            "0x1234",
+            1,
+            "0.26",
+            "0xabcd",
+            "a7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
+        )
 
         # Test invalid UID format
         with pytest.raises(EASValidationError, match="Invalid attestation UID"):
@@ -111,7 +118,14 @@ class TestEASWriteOperations:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
 
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS(
+            "http://test",
+            "0x1234",
+            1,
+            "0.26",
+            "0xabcd",
+            "a7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
+        )
 
         # Test empty revocations list
         with pytest.raises(EASValidationError, match="cannot be empty"):
@@ -129,7 +143,14 @@ class TestEASWriteOperations:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
 
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS(
+            "http://test",
+            "0x1234",
+            1,
+            "0.26",
+            "0xabcd",
+            "a7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
+        )
 
         # Test empty data
         with pytest.raises(EASValidationError, match="cannot be empty"):
@@ -146,7 +167,14 @@ class TestEASWriteOperations:
         mock_web3_class.return_value = mock_w3
         mock_w3.is_connected.return_value = True
 
-        eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+        eas = EAS(
+            "http://test",
+            "0x1234",
+            1,
+            "0.26",
+            "0xabcd",
+            "a7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
+        )
 
         # Test empty data list
         with pytest.raises(EASValidationError, match="cannot be empty"):
@@ -199,7 +227,14 @@ class TestWriteOperationsIntegration:
                 "blockNumber": 12345,
             }
 
-            eas = EAS("http://test", "0x1234", 1, "0.26", "0xabcd", "deadbeef" * 8)
+            eas = EAS(
+                "http://test",
+                "0x1234",
+                1,
+                "0.26",
+                "0xabcd",
+                "a7c5ba7114b7119bb78dfc8e8ccd9f4ad8c6c9f2e8d7ab234fac8b1d5c7e9f12",
+            )
 
             result = eas.revoke_attestation("0x" + "a" * 64)
 
