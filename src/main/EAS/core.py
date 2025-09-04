@@ -549,11 +549,11 @@ class EAS:
         # Get the Attested event topic (first topic is the event signature hash)
         attested_event = self.easContract.events.Attested()
         event_topic = attested_event.build_filter().topics[0]
-        for log in receipt.get('logs', []):
+        for log in receipt.get("logs", []):
             # Filter logs by EAS contract address and Attested event topic
             # Convert both to hex strings for comparison
-            log_topics = getattr(log, 'topics', [])
-            log_address = getattr(log, 'address', '')
+            log_topics = getattr(log, "topics", [])
+            log_address = getattr(log, "address", "")
             if len(log_topics) > 0:
                 if isinstance(log_topics[0], bytes):
                     log_topic = "0x" + log_topics[0].hex()
@@ -592,8 +592,8 @@ class EAS:
         # Add UID and explorer URL to result for easy access
         if attestation_uid:
             # Use setattr to add dynamic attributes
-            setattr(result, 'attestation_uid', attestation_uid)
-            setattr(result, 'explorer_url', self.get_attestation_url(attestation_uid))
+            setattr(result, "attestation_uid", attestation_uid)
+            setattr(result, "explorer_url", self.get_attestation_url(attestation_uid))
         return result
 
     def get_attestation_url(self, attestation_uid: str) -> str:
