@@ -356,7 +356,7 @@ def _fetch_attestation_data(endpoint: str, attestation_uid: str) -> Dict[str, An
     if not attestation_data:
         raise Exception(f"Attestation not found: {attestation_uid}")
 
-    return attestation_data
+    return attestation_data  # type: ignore[no-any-return]
 
 
 def _fetch_schema_data(endpoint: str, schema_uid: str) -> Dict[str, Any]:
@@ -386,7 +386,7 @@ def _fetch_schema_data(endpoint: str, schema_uid: str) -> Dict[str, Any]:
     if not schema_data:
         raise Exception(f"Schema not found: {schema_uid}")
 
-    return schema_data
+    return schema_data  # type: ignore[no-any-return]
 
 
 def _output_encoded_data(

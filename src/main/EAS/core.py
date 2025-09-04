@@ -494,23 +494,17 @@ class EAS:
         from web3 import Web3
 
         # Convert schema_uid to bytes32
-        if isinstance(schema_uid, str):
-            if schema_uid.startswith("0x"):
-                schema_uid_bytes32 = bytes.fromhex(schema_uid[2:].ljust(64, "0"))
-            else:
-                schema_uid_bytes32 = bytes.fromhex(schema_uid.ljust(64, "0"))
+        if schema_uid.startswith("0x"):
+            schema_uid_bytes32 = bytes.fromhex(schema_uid[2:].ljust(64, "0"))
         else:
-            schema_uid_bytes32 = schema_uid
+            schema_uid_bytes32 = bytes.fromhex(schema_uid.ljust(64, "0"))
 
         # Convert ref_uid to bytes32
         ref_uid_value = ref_uid or self.ZERO_ADDRESS
-        if isinstance(ref_uid_value, str):
-            if ref_uid_value.startswith("0x"):
-                ref_uid_bytes32 = bytes.fromhex(ref_uid_value[2:].ljust(64, "0"))
-            else:
-                ref_uid_bytes32 = bytes.fromhex(ref_uid_value.ljust(64, "0"))
+        if ref_uid_value.startswith("0x"):
+            ref_uid_bytes32 = bytes.fromhex(ref_uid_value[2:].ljust(64, "0"))
         else:
-            ref_uid_bytes32 = ref_uid_value
+            ref_uid_bytes32 = bytes.fromhex(ref_uid_value.ljust(64, "0"))
 
         # Prepare attestation request with proper types
         attestation_request_data = (
@@ -555,21 +549,23 @@ class EAS:
         # Get the Attested event topic (first topic is the event signature hash)
         attested_event = self.easContract.events.Attested()
         event_topic = attested_event.build_filter().topics[0]
-        for log in receipt.logs:
+        for log in receipt.get('logs', []):
             # Filter logs by EAS contract address and Attested event topic
             # Convert both to hex strings for comparison
-            if len(log.topics) > 0:
-                if isinstance(log.topics[0], bytes):
-                    log_topic = "0x" + log.topics[0].hex()
+            log_topics = getattr(log, 'topics', [])
+            log_address = getattr(log, 'address', '')
+            if len(log_topics) > 0:
+                if isinstance(log_topics[0], bytes):
+                    log_topic = "0x" + log_topics[0].hex()
                 else:
                     log_topic = (
-                        log.topics[0]
-                        if log.topics[0].startswith("0x")
-                        else "0x" + log.topics[0]
+                        log_topics[0]
+                        if log_topics[0].startswith("0x")
+                        else "0x" + log_topics[0]
                     )
 
                 if (
-                    log.address.lower() == self.easContract.address.lower()
+                    log_address.lower() == self.easContract.address.lower()
                     and log_topic == event_topic
                 ):
                     try:
@@ -595,8 +591,9 @@ class EAS:
         result = TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
         # Add UID and explorer URL to result for easy access
         if attestation_uid:
-            result.attestation_uid = attestation_uid
-            result.explorer_url = self.get_attestation_url(attestation_uid)
+            # Use setattr to add dynamic attributes
+            setattr(result, 'attestation_uid', attestation_uid)
+            setattr(result, 'explorer_url', self.get_attestation_url(attestation_uid))
         return result
 
     def get_attestation_url(self, attestation_uid: str) -> str:
