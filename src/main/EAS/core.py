@@ -567,10 +567,20 @@ class EAS:
 
     def get_attestation_url(self, attestation_uid: str) -> str:
         """Get the explorer URL for an attestation UID using the network config."""
-        from .config import get_network_config
+        from .config import SUPPORTED_CHAINS
         
-        config = get_network_config(self.network_name)
-        base_url = config.get("explorer_url", "https://easscan.org")
+        # Find network by chain_id
+        network_config = None
+        for network_name, config in SUPPORTED_CHAINS.items():
+            if config.get("chain_id") == self.chain_id:
+                network_config = config
+                break
+        
+        if network_config:
+            base_url = network_config.get("explorer_url", "https://easscan.org")
+        else:
+            base_url = "https://easscan.org"  # fallback
+            
         return f"{base_url}/attestation/view/{attestation_uid}"
     
     def __init_schema_registry(self, network_name: str) -> SchemaRegistry:
