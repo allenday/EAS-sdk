@@ -6,7 +6,7 @@ for common conversion patterns. Does not depend on specific target types.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Set, TypeVar
+from typing import Any, Callable, Dict, Optional, Set, TypeVar
 
 from .attestation_converter import AttestationConverter
 
@@ -66,7 +66,7 @@ class ValidatingConverter(ABC):
 class FieldMapper:
     """Utility class for mapping field names and types."""
 
-    def __init__(self, field_mappings: Dict[str, str] = None):
+    def __init__(self, field_mappings: Optional[Dict[str, str]] = None):
         """
         Initialize with field name mappings.
 
@@ -138,7 +138,7 @@ def filtering_converter(
 
 
 def transforming_converter(
-    transformations: Dict[str, callable],
+    transformations: Dict[str, Callable[[Any], Any]],
 ) -> AttestationConverter[Dict[str, Any]]:
     """
     Create a converter that applies transformations to field values.

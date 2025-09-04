@@ -7,12 +7,11 @@ protobuf messages using user-provided conversion strategies.
 
 import json
 import re
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Generic, List, Protocol, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Protocol, TypeVar
 
 from web3 import Web3
 
-from .type_parser import EASField, EASType, EASTypeParser
+from .type_parser import EASType, EASTypeParser
 
 T = TypeVar("T")
 
