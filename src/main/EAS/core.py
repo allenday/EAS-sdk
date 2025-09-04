@@ -559,11 +559,20 @@ class EAS:
                     break
         
         result = TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
-        # Add UID to result for easy access
+        # Add UID and explorer URL to result for easy access
         if attestation_uid:
             result.attestation_uid = attestation_uid
+            result.explorer_url = self.get_attestation_url(attestation_uid)
         return result
 
+    def get_attestation_url(self, attestation_uid: str) -> str:
+        """Get the explorer URL for an attestation UID using the network config."""
+        from .config import get_network_config
+        
+        config = get_network_config(self.network_name)
+        base_url = config.get("explorer_url", "https://easscan.org")
+        return f"{base_url}/attestation/view/{attestation_uid}"
+    
     def __init_schema_registry(self, network_name: str) -> SchemaRegistry:
         """Initialize schema registry for the current network."""
         try:
