@@ -492,23 +492,23 @@ class EAS:
 
         # Convert types to match contract ABI expectations
         from web3 import Web3
-        
+
         # Convert schema_uid to bytes32
         if isinstance(schema_uid, str):
-            if schema_uid.startswith('0x'):
-                schema_uid_bytes32 = bytes.fromhex(schema_uid[2:].ljust(64, '0'))
+            if schema_uid.startswith("0x"):
+                schema_uid_bytes32 = bytes.fromhex(schema_uid[2:].ljust(64, "0"))
             else:
-                schema_uid_bytes32 = bytes.fromhex(schema_uid.ljust(64, '0'))
+                schema_uid_bytes32 = bytes.fromhex(schema_uid.ljust(64, "0"))
         else:
             schema_uid_bytes32 = schema_uid
-        
-        # Convert ref_uid to bytes32 
+
+        # Convert ref_uid to bytes32
         ref_uid_value = ref_uid or self.ZERO_ADDRESS
         if isinstance(ref_uid_value, str):
-            if ref_uid_value.startswith('0x'):
-                ref_uid_bytes32 = bytes.fromhex(ref_uid_value[2:].ljust(64, '0'))
+            if ref_uid_value.startswith("0x"):
+                ref_uid_bytes32 = bytes.fromhex(ref_uid_value[2:].ljust(64, "0"))
             else:
-                ref_uid_bytes32 = bytes.fromhex(ref_uid_value.ljust(64, '0'))
+                ref_uid_bytes32 = bytes.fromhex(ref_uid_value.ljust(64, "0"))
         else:
             ref_uid_bytes32 = ref_uid_value
 
@@ -518,8 +518,8 @@ class EAS:
             int(expiration),  # uint64 (Web3 will handle conversion)
             bool(revocable),  # bool
             ref_uid_bytes32,  # bytes32
-            encoded_data,     # bytes
-            int(0),          # uint256 (value)
+            encoded_data,  # bytes
+            int(0),  # uint256 (value)
         )
         attestation_request = (schema_uid_bytes32, attestation_request_data)
 
@@ -548,10 +548,10 @@ class EAS:
         tx_hash = self.w3.eth.send_raw_transaction(signed_transaction.raw_transaction)
         # Get the transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-        
+
         # Extract attestation UID from logs using the same pattern as TypeScript SDK
         attestation_uid = None
-        
+
         # Get the Attested event topic (first topic is the event signature hash)
         attested_event = self.easContract.events.Attested()
         event_topic = attested_event.build_filter().topics[0]
@@ -560,27 +560,38 @@ class EAS:
             # Convert both to hex strings for comparison
             if len(log.topics) > 0:
                 if isinstance(log.topics[0], bytes):
-                    log_topic = '0x' + log.topics[0].hex()
+                    log_topic = "0x" + log.topics[0].hex()
                 else:
-                    log_topic = log.topics[0] if log.topics[0].startswith('0x') else '0x' + log.topics[0]
-                
-                if (log.address.lower() == self.easContract.address.lower() and log_topic == event_topic):
+                    log_topic = (
+                        log.topics[0]
+                        if log.topics[0].startswith("0x")
+                        else "0x" + log.topics[0]
+                    )
+
+                if (
+                    log.address.lower() == self.easContract.address.lower()
+                    and log_topic == event_topic
+                ):
                     try:
                         # Decode the event log (matches TypeScript: eas.decodeEventLog(event, log.data, log.topics))
                         decoded_log = attested_event.process_log(log)
                         # Extract UID from decoded args (matches TypeScript: [attribute])
-                        uid_value = decoded_log['args']['uid']
+                        uid_value = decoded_log["args"]["uid"]
                         if isinstance(uid_value, bytes):
-                            attestation_uid = '0x' + uid_value.hex()
+                            attestation_uid = "0x" + uid_value.hex()
                         elif isinstance(uid_value, str):
-                            attestation_uid = uid_value if uid_value.startswith('0x') else '0x' + uid_value
+                            attestation_uid = (
+                                uid_value
+                                if uid_value.startswith("0x")
+                                else "0x" + uid_value
+                            )
                         else:
-                            attestation_uid = '0x' + str(uid_value)
+                            attestation_uid = "0x" + str(uid_value)
                         break
                     except Exception:
                         # Continue to next log if this one fails to decode
                         continue
-        
+
         result = TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
         # Add UID and explorer URL to result for easy access
         if attestation_uid:
@@ -591,21 +602,21 @@ class EAS:
     def get_attestation_url(self, attestation_uid: str) -> str:
         """Get the explorer URL for an attestation UID using the network config."""
         from .config import SUPPORTED_CHAINS
-        
+
         # Find network by chain_id
         network_config = None
         for network_name, config in SUPPORTED_CHAINS.items():
             if config.get("chain_id") == self.chain_id:
                 network_config = config
                 break
-        
+
         if network_config:
             base_url = network_config.get("explorer_url", "https://easscan.org")
         else:
             base_url = "https://easscan.org"  # fallback
-            
+
         return f"{base_url}/attestation/view/{attestation_uid}"
-    
+
     def __init_schema_registry(self, network_name: str) -> SchemaRegistry:
         """Initialize schema registry for the current network."""
         try:
