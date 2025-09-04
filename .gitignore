@@ -185,3 +185,4 @@ test_runner.py
 
 src/main/EAS/generated/repository/
 src/proto/repository/
+logs/
