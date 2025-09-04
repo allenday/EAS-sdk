@@ -12,6 +12,7 @@ The EAS SDK is a Python library for seamlessly interacting with the Ethereum Att
 - 📝 On-chain and off-chain attestation support
 - 🚀 Batch attestation and revocation capabilities
 - 🕒 Flexible timestamping functionality
+- 🔄 Typed attestation data conversion from GraphQL to protobuf
 
 ## Installation
 
@@ -145,6 +146,27 @@ base_config = EAS.get_network_config('base')
 - Secure environment variable handling
 - Comprehensive error logging
 - Contract address validation
+
+## Attestation Data Conversion
+
+Convert EAS attestation data from GraphQL responses to strongly-typed protobuf messages:
+
+```python
+from src.main.EAS.attestation_converter import AttestationConverter, from_graphql_json
+
+# Convert GraphQL decodedDataJson to typed objects
+converter = AttestationConverter(
+    lambda data: YourProtobufType(
+        domain=data.get("domain", ""),
+        identifier=data.get("identifier", "")
+    )
+)
+
+graphql_data = from_graphql_json('your_decoded_data_json')
+typed_result = converter.convert(graphql_data)
+```
+
+For detailed usage examples and advanced patterns, see [Attestation Converter Documentation](docs/attestation_converter.md).
 
 ## Error Handling
 
