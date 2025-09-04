@@ -19,7 +19,6 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
-from .proto_helpers import parse_graphql_response
 from .schema_encoder import encode_schema_data
 from .schema_generator import generate_schema_code
 
@@ -156,10 +155,8 @@ def show_schema_impl(
         if not schema_data:
             raise Exception(f"Schema not found: {schema_uid}")
 
-        # Parse through protobuf for type safety and validation
-        parsed_data = parse_graphql_response(json.dumps(result), "schema")
-        if not parsed_data:
-            raise Exception(f"Failed to parse schema data: {schema_uid}")
+        # Use schema data directly
+        parsed_data = schema_data
 
         # Format and display
         if output_format == "eas":
@@ -299,10 +296,8 @@ def show_attestation_impl(
         if not attestation_data:
             raise Exception(f"Attestation not found: {attestation_uid}")
 
-        # Parse through protobuf for type safety and validation
-        parsed_data = parse_graphql_response(json.dumps(result), "attestation")
-        if not parsed_data:
-            raise Exception(f"Failed to parse attestation data: {attestation_uid}")
+        # Use attestation data directly
+        parsed_data = attestation_data
 
         # Format and display
         if output_format == "eas":
@@ -327,7 +322,7 @@ def _get_endpoint_for_network(network: str) -> str:
     return endpoint
 
 
-def _fetch_attestation_data(endpoint: str, attestation_uid: str) -> dict:
+def _fetch_attestation_data(endpoint: str, attestation_uid: str) -> Dict[str, Any]:
     """Fetch and validate attestation data from GraphQL endpoint."""
     query = """
     query GetAttestation($uid: String!) {
@@ -361,14 +356,10 @@ def _fetch_attestation_data(endpoint: str, attestation_uid: str) -> dict:
     if not attestation_data:
         raise Exception(f"Attestation not found: {attestation_uid}")
 
-    parsed_data = parse_graphql_response(json.dumps(result), "attestation")
-    if not parsed_data:
-        raise Exception(f"Failed to parse attestation data: {attestation_uid}")
-
-    return parsed_data
+    return attestation_data  # type: ignore[no-any-return]
 
 
-def _fetch_schema_data(endpoint: str, schema_uid: str) -> dict:
+def _fetch_schema_data(endpoint: str, schema_uid: str) -> Dict[str, Any]:
     """Fetch and validate schema data from GraphQL endpoint."""
     schema_query = """
     query GetSchema($uid: String!) {
@@ -395,11 +386,7 @@ def _fetch_schema_data(endpoint: str, schema_uid: str) -> dict:
     if not schema_data:
         raise Exception(f"Schema not found: {schema_uid}")
 
-    parsed_schema = parse_graphql_response(json.dumps(schema_result), "schema")
-    if not parsed_schema:
-        raise Exception(f"Failed to parse schema data: {schema_uid}")
-
-    return parsed_schema
+    return schema_data  # type: ignore[no-any-return]
 
 
 def _output_encoded_data(
@@ -474,10 +461,10 @@ def encode_schema_impl(
         if not attestation_data_hex:
             raise Exception(f"No data field found in attestation: {attestation_uid}")
 
-        # Parse the attestation data according to the schema definition
-        from .data_parser import parse_attestation_data
+        # Parse the attestation data using new converter system
+        from .attestation_converter import parse_hex_attestation_data
 
-        parsed_attestation_data = parse_attestation_data(
+        parsed_attestation_data = parse_hex_attestation_data(
             attestation_data_hex, schema_definition
         )
 
