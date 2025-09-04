@@ -490,16 +490,38 @@ class EAS:
             except Exception as e:
                 raise Exception(f"Failed to encode attestation data: {str(e)}")
 
-        # Prepare attestation request
+        # Convert types to match contract ABI expectations
+        from web3 import Web3
+        
+        # Convert schema_uid to bytes32
+        if isinstance(schema_uid, str):
+            if schema_uid.startswith('0x'):
+                schema_uid_bytes32 = bytes.fromhex(schema_uid[2:].ljust(64, '0'))
+            else:
+                schema_uid_bytes32 = bytes.fromhex(schema_uid.ljust(64, '0'))
+        else:
+            schema_uid_bytes32 = schema_uid
+        
+        # Convert ref_uid to bytes32 
+        ref_uid_value = ref_uid or self.ZERO_ADDRESS
+        if isinstance(ref_uid_value, str):
+            if ref_uid_value.startswith('0x'):
+                ref_uid_bytes32 = bytes.fromhex(ref_uid_value[2:].ljust(64, '0'))
+            else:
+                ref_uid_bytes32 = bytes.fromhex(ref_uid_value.ljust(64, '0'))
+        else:
+            ref_uid_bytes32 = ref_uid_value
+
+        # Prepare attestation request with proper types
         attestation_request_data = (
-            recipient,
-            expiration,
-            revocable,
-            ref_uid or self.ZERO_ADDRESS,
-            encoded_data,
-            0,  # No value sent
+            Web3.to_checksum_address(recipient),  # address
+            int(expiration),  # uint64 (Web3 will handle conversion)
+            bool(revocable),  # bool
+            ref_uid_bytes32,  # bytes32
+            encoded_data,     # bytes
+            int(0),          # uint256 (value)
         )
-        attestation_request = (schema_uid, attestation_request_data)
+        attestation_request = (schema_uid_bytes32, attestation_request_data)
 
         # Gas estimation
         gas_estimate = self.easContract.functions.attest(
@@ -523,10 +545,24 @@ class EAS:
             transaction, self.private_key
         )
         # Send the transaction
-        tx_hash = self.w3.eth.send_raw_transaction(signed_transaction.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_transaction.raw_transaction)
         # Get the transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-        return TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
+        
+        # Extract attestation UID from logs (EAS contract emits Attested event with UID)
+        attestation_uid = None
+        for log in receipt.logs:
+            if log.address.lower() == self.easContract.address.lower():
+                # The first topic after the event signature is typically the UID in EAS
+                if len(log.topics) > 1:
+                    attestation_uid = log.topics[1].hex()  # UID as hex string
+                    break
+        
+        result = TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
+        # Add UID to result for easy access
+        if attestation_uid:
+            result.attestation_uid = attestation_uid
+        return result
 
     def __init_schema_registry(self, network_name: str) -> SchemaRegistry:
         """Initialize schema registry for the current network."""
@@ -623,7 +659,7 @@ class EAS:
             )
 
             # Send transaction
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -743,7 +779,7 @@ class EAS:
             )
 
             # Send transaction
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -886,7 +922,7 @@ class EAS:
             )
 
             # Send transaction
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -1007,7 +1043,7 @@ class EAS:
             )
 
             # Send transaction
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -1117,7 +1153,7 @@ class EAS:
             )
 
             # Send transaction
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info(
@@ -1598,7 +1634,7 @@ class EAS:
             signed_txn = Account.sign_transaction(
                 transaction, private_key=self.private_key
             )
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
             tx_hash_hex = tx_hash.hex()
 
             logger.info("multi_attest_submitted", tx_hash=tx_hash_hex)
