@@ -549,14 +549,37 @@ class EAS:
         # Get the transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         
-        # Extract attestation UID from logs (EAS contract emits Attested event with UID)
+        # Extract attestation UID from logs using the same pattern as TypeScript SDK
         attestation_uid = None
+        
+        # Get the Attested event topic (first topic is the event signature hash)
+        attested_event = self.easContract.events.Attested()
+        event_topic = attested_event.build_filter().topics[0]
         for log in receipt.logs:
-            if log.address.lower() == self.easContract.address.lower():
-                # The first topic after the event signature is typically the UID in EAS
-                if len(log.topics) > 1:
-                    attestation_uid = log.topics[1].hex()  # UID as hex string
-                    break
+            # Filter logs by EAS contract address and Attested event topic
+            # Convert both to hex strings for comparison
+            if len(log.topics) > 0:
+                if isinstance(log.topics[0], bytes):
+                    log_topic = '0x' + log.topics[0].hex()
+                else:
+                    log_topic = log.topics[0] if log.topics[0].startswith('0x') else '0x' + log.topics[0]
+                
+                if (log.address.lower() == self.easContract.address.lower() and log_topic == event_topic):
+                    try:
+                        # Decode the event log (matches TypeScript: eas.decodeEventLog(event, log.data, log.topics))
+                        decoded_log = attested_event.process_log(log)
+                        # Extract UID from decoded args (matches TypeScript: [attribute])
+                        uid_value = decoded_log['args']['uid']
+                        if isinstance(uid_value, bytes):
+                            attestation_uid = '0x' + uid_value.hex()
+                        elif isinstance(uid_value, str):
+                            attestation_uid = uid_value if uid_value.startswith('0x') else '0x' + uid_value
+                        else:
+                            attestation_uid = '0x' + str(uid_value)
+                        break
+                    except Exception:
+                        # Continue to next log if this one fails to decode
+                        continue
         
         result = TransactionResult.success_from_receipt(tx_hash.hex(), dict(receipt))
         # Add UID and explorer URL to result for easy access
