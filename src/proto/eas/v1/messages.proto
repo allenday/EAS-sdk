@@ -6,49 +6,81 @@ option go_package = "github.com/eas-sdk/proto/eas/v1;easv1";
 option java_package = "com.eas.sdk.proto.eas.v1";
 option java_multiple_files = true;
 
+import "buf/validate/validate.proto";
+
 // EAS Schema message representing a schema from the GraphQL API
 message Schema {
   // Schema ID (hex string)
-  string id = 1;
+  string id = 1 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // Schema definition string
-  string schema = 2;
+  string schema = 2 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 10000  // Reasonable limit for schema definition
+  }];
   
   // Creator address (hex string)
-  string creator = 3;
+  string creator = 3 [(buf.validate.field).string = {
+    len: 42,
+    pattern: "^0x[a-fA-F0-9]{40}$"  // Ethereum address format
+  }];
   
   // Resolver address (hex string)
-  string resolver = 4;
+  string resolver = 4 [(buf.validate.field).string = {
+    len: 42,
+    pattern: "^0x[a-fA-F0-9]{40}$"  // Ethereum address format
+  }];
   
   // Whether the schema is revocable
   bool revocable = 5;
   
   // Schema index (string representation)
-  string index = 6;
+  string index = 6 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 100
+  }];
   
   // Transaction ID (hex string)
-  string txid = 7;
+  string txid = 7 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // Timestamp (Unix timestamp)
-  uint64 time = 8;
+  uint64 time = 8 [(buf.validate.field).uint64.gt = 0];
 }
 
 // EAS Attestation message representing an attestation from the GraphQL API
 message Attestation {
   // Attestation ID (hex string)
-  string id = 1;
+  string id = 1 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // Schema ID (hex string)
-  string schema_id = 2;
+  string schema_id = 2 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // Attester address (hex string)
-  string attester = 3;
+  string attester = 3 [(buf.validate.field).string = {
+    len: 42,
+    pattern: "^0x[a-fA-F0-9]{40}$"  // Ethereum address format
+  }];
   
   // Recipient address (hex string)
-  string recipient = 4;
+  string recipient = 4 [(buf.validate.field).string = {
+    len: 42,
+    pattern: "^0x[a-fA-F0-9]{40}$"  // Ethereum address format
+  }];
   
   // Timestamp (Unix timestamp)
-  uint64 time = 5;
+  uint64 time = 5 [(buf.validate.field).uint64.gt = 0];
   
   // Expiration time (Unix timestamp, 0 if no expiration)
   uint64 expiration_time = 6;
@@ -60,22 +92,33 @@ message Attestation {
   bool revoked = 8;
   
   // Attestation data (hex string)
-  string data = 9;
+  string data = 9 [(buf.validate.field).string = {
+    pattern: "^0x[a-fA-F0-9]*$"  // Hex string with 0x prefix (variable length)
+  }];
   
   // Transaction ID (hex string)
-  string txid = 10;
+  string txid = 10 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // Time created (Unix timestamp)
-  uint64 time_created = 11;
+  uint64 time_created = 11 [(buf.validate.field).uint64.gt = 0];
   
   // Revocation time (Unix timestamp, 0 if not revoked)
   uint64 revocation_time = 12;
   
   // Reference UID (hex string)
-  string ref_uid = 13;
+  string ref_uid = 13 [(buf.validate.field).string = {
+    len: 66,
+    pattern: "^0x[a-fA-F0-9]{64}$"  // 32-byte hex string with 0x prefix
+  }];
   
   // IPFS hash (empty string if not stored on IPFS)
-  string ipfs_hash = 14;
+  string ipfs_hash = 14 [(buf.validate.field).string = {
+    max_len: 100,
+    pattern: "^[A-Za-z0-9]*$"  // Valid IPFS hash characters (can be empty)
+  }];
   
   // Whether this is an offchain attestation
   bool is_offchain = 15;
@@ -93,9 +136,16 @@ message AttestationResponse {
 
 // GraphQL error message
 message GraphQLError {
-  string message = 1;
-  repeated string locations = 2;
-  repeated string path = 3;
+  string message = 1 [(buf.validate.field).string = {
+    min_len: 1,
+    max_len: 1000  // Reasonable limit for error messages
+  }];
+  repeated string locations = 2 [(buf.validate.field).repeated = {
+    max_items: 10
+  }];
+  repeated string path = 3 [(buf.validate.field).repeated = {
+    max_items: 20
+  }];
 }
 
 // Complete GraphQL response structure
@@ -107,5 +157,7 @@ message GraphQLResponse {
   }
   
   // Errors field for GraphQL errors
-  repeated GraphQLError errors = 3;
+  repeated GraphQLError errors = 3 [(buf.validate.field).repeated = {
+    max_items: 50  // Reasonable limit for GraphQL errors
+  }];
 } 

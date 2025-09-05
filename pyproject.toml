@@ -38,6 +38,7 @@ dependencies = [
     "grpcio-status",
     "structlog",
     "pydantic>=2.0.0",
+    "protovalidate>=0.15.0",
 ]
 
 [project.optional-dependencies]

@@ -20,6 +20,14 @@ tasks:
     cmds:
       - echo "📦 Installing dependencies..."
       - '{{.VENV_DIR}}/bin/pip install -e .[dev]'
+      - |
+        # Fix missing google/__init__.py file (common protobuf installation issue)
+        PYTHON_VERSION=$({{.VENV_DIR}}/bin/python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        GOOGLE_PKG_DIR="{{.VENV_DIR}}/lib/python${PYTHON_VERSION}/site-packages/google"
+        if [ -d "$GOOGLE_PKG_DIR" ] && [ ! -f "$GOOGLE_PKG_DIR/__init__.py" ]; then
+          echo "Creating missing google/__init__.py file..."
+          touch "$GOOGLE_PKG_DIR/__init__.py" 2>/dev/null || true
+        fi
       - echo "✅ Dependencies installed successfully"
 
   _ensure-venv:
@@ -169,6 +177,43 @@ tasks:
       - task: check
       - task: test:all
       - echo "✅ CI pipeline completed successfully"
+
+  # Protocol Buffer generation tasks
+  install:buf:
+    desc: Install buf CLI for protobuf generation
+    cmds:
+      - echo "📦 Installing buf CLI..."
+      - |
+        if ! command -v buf &> /dev/null; then
+          curl -sSL https://github.com/bufbuild/buf/releases/latest/download/buf-$(uname -s)-$(uname -m) -o /usr/local/bin/buf
+          chmod +x /usr/local/bin/buf
+        else
+          echo "buf CLI already installed"
+        fi
+
+  generate:proto:
+    desc: Generate Python protobuf files using buf
+    deps: [install:buf]
+    cmds:
+      - echo "🔧 Generating Python protobuf files..."
+      - mkdir -p logs
+      - cd src/proto && buf dep update
+      - cd src/proto && buf lint
+      - buf generate --template buf.gen.python.yaml --include-imports src/proto
+      - echo "✅ Protobuf files generated successfully"
+
+  clean:proto:
+    desc: Clean generated protobuf files
+    cmds:
+      - echo "🧹 Cleaning generated protobuf files..."
+      - rm -rf src/main/EAS/generated/
+      - echo "✅ Protobuf files cleaned"
+
+  proto:
+    desc: Clean and regenerate all protobuf files
+    cmds:
+      - task: clean:proto
+      - task: generate:proto
 
   # Utility tasks
   deps:

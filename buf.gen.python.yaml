@@ -1,0 +1,6 @@
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/python
+    out: src/main/EAS/generated
+  - plugin: buf.build/protocolbuffers/pyi
+    out: src/main/EAS/generated
